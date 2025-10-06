@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "683717a59ad88cc4",
+        "id": "64238eb53316c833",
         "type": "tabs",
         "children": [
           {
-            "id": "d2515bb38d149579",
+            "id": "23fe2e7031201d89",
             "type": "leaf",
             "state": {
               "type": "markdown",
@@ -170,8 +170,15 @@
       "bases:Create new base": false
     }
   },
-  "active": "d2515bb38d149579",
+  "active": "23fe2e7031201d89",
   "lastOpenFiles": [
+    "Minimal_Commander_Complete_Roadmap.md",
+    "src/modules/minimal_commander/README.md",
+    "src/modules/minimal_commander/minimal_parameters.hpp",
+    "src/modules/minimal_commander/minimal_state_machine.hpp",
+    "src/modules/minimal_commander/minimal_commander.cpp",
+    "src/modules/minimal_commander/minimal_commander.hpp",
+    "src/modules/minimal_commander/CMakeLists.txt",
     "src/modules/minimal_commander",
     "Work_Item_Scheduling_Flow.md",
     "px4_function_modifications.md",
@@ -180,14 +187,8 @@
     "line-follower-simulator/scripts/utils.py",
     "line-follower-simulator/scripts/setup.txt",
     "line-follower-simulator/scripts/setup.py",
-    "line-follower-simulator/scripts/main.py",
-    "line-follower-simulator/scripts/classes.py",
-    "line-follower-simulator/scripts",
-    "line-follower-simulator/requirements.txt",
     "line-follower-simulator/images/robot.png",
     "line-follower-simulator/images/map.png",
-    "line-follower-simulator/images",
-    "line-follower-simulator/environment.yml",
     "line-follower-simulator/README.md",
     "px4_interdependencies.md",
     "PX4_Control_Architecture_Analysis.md"
