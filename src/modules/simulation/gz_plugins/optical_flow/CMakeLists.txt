@@ -62,4 +62,6 @@ target_include_directories(${PROJECT_NAME}
     PUBLIC px4_gz_msgs
 )
 
+target_compile_options(${PROJECT_NAME} PRIVATE -Wno-double-promotion -Wno-unused-private-field)
+
 add_dependencies(${PROJECT_NAME} OpticalFlow)

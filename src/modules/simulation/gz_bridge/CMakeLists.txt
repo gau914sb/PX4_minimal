@@ -72,6 +72,7 @@ if (gz-transport_FOUND)
 
 	target_include_directories(modules__simulation__gz_bridge PUBLIC px4_gz_msgs)
 	target_link_libraries(modules__simulation__gz_bridge PUBLIC px4_gz_msgs)
+	target_compile_options(modules__simulation__gz_bridge PRIVATE -Wno-double-promotion)
 
 	px4_add_git_submodule(TARGET git_gz PATH "${PX4_SOURCE_DIR}/Tools/simulation/gz")
 	include(ExternalProject)

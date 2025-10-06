@@ -1,0 +1,107 @@
+#!/bin/sh
+#
+# IRONHIDE's Ultra-Minimal PX4 Startup Script
+# MISSION: Rate Controller Only Operation
+# TARGET: No position controller dependencies
+#
+
+# Set shell to exit on error
+set -e
+
+# Essential PX4 components for rate controller operation
+. ${R}etc/init.d-posix/rcS
+
+# Configure minimal parameters for rate-controller-only operation
+param set-default SYS_AUTOSTART 4001    # Generic quadrotor
+param set-default SYS_MC_EST_GROUP 2    # EKF2 estimator
+
+# CRITICAL: Force stabilized mode operation only
+param set-default COM_FLTMODE1 0         # Manual mode
+param set-default COM_FLTMODE4 0         # Manual mode  
+param set-default COM_FLTMODE6 0         # Manual mode
+
+# Disable auto modes that require position controller
+param set-default MIS_TAKEOFF_ALT 0      # No auto takeoff
+param set-default RTL_RETURN_ALT 0       # No RTL mode
+param set-default NAV_ACC_RAD 0          # No navigation acceptance radius
+
+# Rate controller tuning (keep existing tuning)
+param set-default MC_ROLLRATE_P 0.15
+param set-default MC_ROLLRATE_I 0.1  
+param set-default MC_ROLLRATE_D 0.003
+param set-default MC_PITCHRATE_P 0.15
+param set-default MC_PITCHRATE_I 0.1
+param set-default MC_PITCHRATE_D 0.003
+param set-default MC_YAWRATE_P 0.2
+param set-default MC_YAWRATE_I 0.1
+param set-default MC_YAWRATE_D 0.0
+
+# Attitude controller settings (minimal interface to rate controller)
+param set-default MC_ROLL_P 6.5
+param set-default MC_PITCH_P 6.5
+param set-default MC_YAW_P 2.8
+
+# Disable position controller parameters
+param set-default MPC_XY_P 0           # Disable position P gain
+param set-default MPC_Z_P 0            # Disable altitude P gain
+param set-default MPC_XY_VEL_P_ACC 0   # Disable velocity control
+param set-default MPC_Z_VEL_P_ACC 0    # Disable altitude velocity control
+
+# EKF2 minimal configuration (attitude estimation only)
+param set-default EKF2_AID_MASK 1      # GPS disabled, use only IMU
+param set-default EKF2_HGT_MODE 0      # Barometric height disabled
+param set-default EKF2_GPS_CHECK 0     # Disable GPS checks
+
+# COMMANDER settings for minimal operation
+param set-default COM_ARM_EKF_POS 0    # Disable position check for arming
+param set-default COM_ARM_EKF_VEL 0    # Disable velocity check for arming
+param set-default COM_ARM_EKF_HGT 0    # Disable height check for arming
+
+# Force manual control priority
+param set-default COM_RC_OVERRIDE 0    # Manual control has priority
+param set-default COM_RC_IN_MODE 1     # RC input required
+
+# Simulation specific
+param set-default SIM_BAT_ENABLE 0     # Disable battery simulation
+param set-default SIM_GPS_USED 0       # Disable GPS simulation
+
+# Start essential modules only
+dataman start
+param load
+param select
+
+# EKF2 for attitude estimation
+ekf2 start &
+
+# Sensors
+sensors start
+
+# Manual control input
+manual_control start &
+
+# Rate controller (PRIMARY TARGET)
+mc_rate_control start &
+
+# Attitude controller (interface layer)
+mc_att_control start &
+
+# Control allocator (convert rates to motor commands)  
+control_allocator start &
+
+# Commander (arming/disarming)
+commander start &
+
+# MAVLink for communication
+mavlink start -x -u 14556 -r 4000000 &
+mavlink start -x -u 14557 -r 4000000 -m onboard -o 14540 &
+
+# Simulator interface
+simulator_mavlink start -c $simulator_tcp_port &
+
+# Wait for all background processes
+wait
+
+echo "IRONHIDE ULTRA-MINIMAL: Rate controller only system ready! 🚛💥"
+echo "Available modes: MANUAL, STABILIZED only"
+echo "Position controller: DISABLED"
+echo "Target achieved: Rate controller + essential support only"
