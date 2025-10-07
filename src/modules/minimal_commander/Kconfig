@@ -1,0 +1,12 @@
+menuconfig MODULES_MINIMAL_COMMANDER
+	bool "minimal_commander"
+	default n
+	---help---
+		Enable support for minimal_commander (lightweight commander for research/dev)
+
+menuconfig USER_MINIMAL_COMMANDER
+	bool "minimal_commander running as userspace module"
+	default y
+	depends on BOARD_PROTECTED && MODULES_MINIMAL_COMMANDER
+	---help---
+		Put minimal_commander in userspace memory

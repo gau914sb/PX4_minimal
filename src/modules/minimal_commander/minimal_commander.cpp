@@ -6,7 +6,9 @@
  * modification, are permitted provided that the following conditions
  * are met:
  *
- * 1. Redistributions of source code must retain the above copyright
+ * 1. Redistributions of source code must retain the     _vehicle_status.arming_state = (MinimalStateMachine::is_armed(_state)) ?
+                         vehicle_status_s::ARMING_STATE_ARMED :
+                         vehicle_status_s::ARMING_STATE_DISARMED;ve copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -119,7 +121,7 @@ int MinimalCommander::init()
     _vehicle_status.system_id = 1;
     _vehicle_status.component_id = 1;
     _vehicle_status.vehicle_type = vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
-    _vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_STANDBY;
+    _vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
     _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 
     // Schedule the first run
@@ -146,6 +148,7 @@ void MinimalCommander::Run()
 
     // Core processing functions
     process_commands();
+    check_offboard_timeout();
     check_battery_status();
     publish_status();
 
@@ -161,15 +164,22 @@ void MinimalCommander::process_commands()
         switch (cmd.command) {
         case vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM:
             if (cmd.param1 > 0.5f) {
-                // ARM command - Check minimal safety first
+                // ARM command - Check state transition validity AND minimal safety
                 if (_state == MinimalCommanderState::DISARMED) {
-                    if (_safety_checks.checkAndUpdateArmingState()) {
-                        _state = MinimalCommanderState::ARMED;
-                        _armed_timestamp = hrt_absolute_time();
-                        _arm_disarm_cycles++;
-                        PX4_INFO("ARMED via command (minimal safety OK)");
+                    if (MinimalStateMachine::can_transition(_state, MinimalCommanderState::ARMED)) {
+                        if (_safety_checks.checkAndUpdateArmingState()) {
+                            _state = MinimalCommanderState::ARMED;
+                            _armed_timestamp = hrt_absolute_time();
+                            _arm_disarm_cycles++;
+                            PX4_INFO("ARMED via command (minimal safety OK)");
+                            answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
+                        } else {
+                            PX4_WARN("Arming BLOCKED - Essential safety check failed");
+                            answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_TEMPORARILY_REJECTED);
+                        }
                     } else {
-                        PX4_WARN("Arming BLOCKED - Essential safety check failed");
+                        PX4_WARN("Invalid state transition");
+                        answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_DENIED);
                     }
                 }
             } else {
@@ -201,8 +211,9 @@ void MinimalCommander::process_commands()
     // Process offboard control mode (auto-arm on offboard commands)
     offboard_control_mode_s offboard_mode;
     if (_offboard_control_mode_sub.update(&offboard_mode)) {
+        _last_offboard_timestamp = hrt_absolute_time();  // Track offboard activity
         if (_state == MinimalCommanderState::DISARMED &&
-            (offboard_mode.attitude || offboard_mode.rates)) {
+            (offboard_mode.attitude || offboard_mode.body_rate)) {
             if (_safety_checks.checkAndUpdateArmingState()) {
                 _state = MinimalCommanderState::ARMED;
                 _armed_timestamp = hrt_absolute_time();
@@ -219,7 +230,7 @@ void MinimalCommander::process_commands()
     if (_manual_control_setpoint_sub.update(&manual_control)) {
         // Classic stick arming: throttle low + yaw right
         if (_state == MinimalCommanderState::DISARMED &&
-            manual_control.z < 0.1f && manual_control.r > 0.8f) {
+            manual_control.throttle < 0.1f && manual_control.yaw > 0.8f) {
             if (_safety_checks.checkAndUpdateArmingState()) {
                 _state = MinimalCommanderState::ARMED;
                 _armed_timestamp = hrt_absolute_time();
@@ -231,7 +242,7 @@ void MinimalCommander::process_commands()
         }
         // Stick disarming: throttle low + yaw left
         else if (MinimalStateMachine::is_armed(_state) &&
-                 manual_control.z < 0.1f && manual_control.r < -0.8f) {
+                 manual_control.throttle < 0.1f && manual_control.yaw < -0.8f) {
             _state = MinimalCommanderState::DISARMED;
             PX4_INFO("DISARMED via RC sticks");
         }
@@ -258,6 +269,34 @@ void MinimalCommander::process_takeoff_land_commands(const vehicle_command_s &cm
     default:
         break;
     }
+}
+
+void MinimalCommander::check_offboard_timeout()
+{
+    // Monitor offboard control mode timeout (500ms)
+    if (MinimalStateMachine::is_armed(_state) && _last_offboard_timestamp > 0) {
+        const hrt_abstime timeout_us = 500_ms;
+        const hrt_abstime now = hrt_absolute_time();
+
+        if ((now - _last_offboard_timestamp) > timeout_us) {
+            _state = MinimalCommanderState::DISARMED;
+            PX4_WARN("DISARMED - Offboard control timeout (>500ms)");
+            _last_offboard_timestamp = 0;  // Reset for next session
+        }
+    }
+}
+
+void MinimalCommander::answer_command(const vehicle_command_s &cmd, uint8_t result)
+{
+    vehicle_command_ack_s ack{};
+    ack.timestamp = hrt_absolute_time();
+    ack.command = cmd.command;
+    ack.result = result;
+    ack.from_external = false;
+    ack.target_system = cmd.source_system;
+    ack.target_component = cmd.source_component;
+
+    _vehicle_command_ack_pub.publish(ack);
 }
 
 void MinimalCommander::handle_takeoff_command()
@@ -322,14 +361,11 @@ void MinimalCommander::publish_status()
     status.nav_state = _vehicle_status.nav_state;
     status.arming_state = MinimalStateMachine::is_armed(_state) ?
                          vehicle_status_s::ARMING_STATE_ARMED :
-                         vehicle_status_s::ARMING_STATE_STANDBY;
+                         vehicle_status_s::ARMING_STATE_DISARMED;
     status.system_type = vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
     status.system_id = 1;
     status.component_id = 1;
     status.vehicle_type = vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
-
-    // Include battery warning in status
-    status.battery_warning = _battery_warning;
 
     // Set failsafe status based on battery
     status.failsafe = (_battery_warning >= battery_status_s::WARNING_LOW);
@@ -343,7 +379,6 @@ void MinimalCommander::publish_status()
     armed.prearmed = false;
     armed.ready_to_arm = (_state == MinimalCommanderState::DISARMED);
     armed.lockdown = (_state == MinimalCommanderState::EMERGENCY);
-    armed.force_failsafe = (_state == MinimalCommanderState::EMERGENCY);
 
     _actuator_armed_pub.publish(armed);
 

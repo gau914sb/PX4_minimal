@@ -260,7 +260,7 @@ tone_alarm start
 rc_update start
 manual_control start
 sensors start
-commander start
+minimal_commander start
 
 #
 # state estimator selection

@@ -15,6 +15,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_command.h>
+#include <uORB/topics/vehicle_command_ack.h>
 #include <uORB/topics/offboard_control_mode.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/battery_status.h>
@@ -42,8 +43,16 @@ public:
     static int custom_command(int argc, char *argv[]);
     static int print_usage(const char *reason = nullptr);
 
-    int init() override;
+    int init();
     int print_status() override;
+
+    // State management (public so MinimalStateMachine can access it)
+    enum class MinimalCommanderState {
+        INIT,
+        DISARMED,
+        ARMED,
+        EMERGENCY
+    };
 
 private:
     void Run() override;
@@ -53,23 +62,15 @@ private:
     void process_takeoff_land_commands(const vehicle_command_s &cmd);
     void handle_takeoff_command();
     void check_battery_status();
+    void check_offboard_timeout();
     void publish_status();
+    void answer_command(const vehicle_command_s &cmd, uint8_t result);
 
-    // State management
-    enum class MinimalCommanderState {
-        INIT,
-        DISARMED,
-        ARMED,
-        EMERGENCY
-    } _state{MinimalCommanderState::INIT};
+    // State variable
+    MinimalCommanderState _state{MinimalCommanderState::INIT};
 
     // Safety infrastructure (essential systems only)
-    Failsafe                _failsafe_instance{this};
-    FailsafeBase           &_failsafe{_failsafe_instance};
-    FailureDetector        _failure_detector{this};
-    MinimalSafetyChecks    _safety_checks{this, _vehicle_status};
-    Safety                 _safety{};
-    WorkerThread          _worker_thread{};
+    MinimalSafetyChecks    _safety_checks{this};
 
     // uORB subscriptions (minimal set - 5 topics verified)
     uORB::Subscription _vehicle_command_sub{ORB_ID(vehicle_command)};
@@ -83,21 +84,23 @@ private:
     uORB::Publication<vehicle_status_s>      _vehicle_status_pub{ORB_ID(vehicle_status)};
     uORB::Publication<actuator_armed_s>      _actuator_armed_pub{ORB_ID(actuator_armed)};
     uORB::Publication<vehicle_control_mode_s> _vehicle_control_mode_pub{ORB_ID(vehicle_control_mode)};
+    uORB::Publication<vehicle_command_ack_s> _vehicle_command_ack_pub{ORB_ID(vehicle_command_ack)};
 
     // Internal state tracking
     vehicle_status_s _vehicle_status{};
     hrt_abstime _armed_timestamp{0};
+    hrt_abstime _last_offboard_timestamp{0};
     uint16_t _arm_disarm_cycles{0};
     uint16_t _emergency_stops{0};
     uint8_t _battery_warning{battery_status_s::WARNING_NONE};
     bool _low_battery_disarm_enabled{true};
-    
+
     // Performance monitoring
     perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
     // Parameters (minimal set)
     DEFINE_PARAMETERS(
-        (ParamFloat<px4::params::COM_LOW_BAT_ACT>) _param_com_low_bat_act,
+        (ParamInt<px4::params::COM_LOW_BAT_ACT>) _param_com_low_bat_act,
         (ParamFloat<px4::params::BAT_LOW_THR>) _param_bat_low_thr
     )
 };

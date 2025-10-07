@@ -125,7 +125,7 @@ INIT → DISARMED ⇄ ARMED
 px4_add_module(
     MODULE modules__minimal_commander
     MAIN minimal_commander
-    SRCS 
+    SRCS
         minimal_commander.cpp
         minimal_safety_checks.cpp
     DEPENDS
