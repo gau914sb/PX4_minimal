@@ -6,6 +6,7 @@
 #include <px4_platform_common/module_params.h>
 #include <px4_platform_common/px4_work_queue/ScheduledWorkItem.hpp>
 
+#include <lib/perf/perf_counter.h>
 #include <uORB/Publication.hpp>
 #include <uORB/Subscription.hpp>
 
@@ -18,7 +19,7 @@
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/system_power.h>
-#include <uORB/topics/safety.h>
+#include <uORB/topics/parameter_update.h>
 
 // Safety infrastructure (minimal set)
 #include "failsafe/failsafe.h"
@@ -76,6 +77,7 @@ private:
     uORB::Subscription _manual_control_setpoint_sub{ORB_ID(manual_control_setpoint)};
     uORB::Subscription _battery_status_sub{ORB_ID(battery_status)};
     uORB::Subscription _system_power_sub{ORB_ID(system_power)};
+    uORB::Subscription _parameter_update_sub{ORB_ID(parameter_update)};
 
     // uORB publications
     uORB::Publication<vehicle_status_s>      _vehicle_status_pub{ORB_ID(vehicle_status)};
@@ -89,6 +91,9 @@ private:
     uint16_t _emergency_stops{0};
     uint8_t _battery_warning{battery_status_s::WARNING_NONE};
     bool _low_battery_disarm_enabled{true};
+    
+    // Performance monitoring
+    perf_counter_t _loop_perf{perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")};
 
     // Parameters (minimal set)
     DEFINE_PARAMETERS(

@@ -719,10 +719,10 @@ void MinimalCommander::handle_takeoff_command()
 {
     // Simple takeoff via offboard mode activation
     if (_state == MinimalCommanderState::ARMED) {
-        
+
         // Set navigation state to offboard for external control
         _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_OFFBOARD;
-        
+
         // Enable offboard control mode
         vehicle_control_mode_s control_mode{};
         control_mode.timestamp = hrt_absolute_time();
@@ -731,9 +731,9 @@ void MinimalCommander::handle_takeoff_command()
         control_mode.flag_control_rates_enabled = true;
         control_mode.flag_control_attitude_enabled = false; // Use rates only
         control_mode.flag_control_position_enabled = false; // No position control
-        
+
         _vehicle_control_mode_pub.publish(control_mode);
-        
+
         PX4_INFO("Takeoff mode enabled - External controller active");
         PX4_INFO("Publish vehicle_rates_setpoint for takeoff control");
     }
@@ -750,13 +750,13 @@ void MinimalCommander::process_takeoff_land_commands(const vehicle_command_s &cm
             PX4_WARN("Takeoff rejected - Vehicle not armed");
         }
         break;
-        
+
     case vehicle_command_s::VEHICLE_CMD_NAV_LAND:
         // Simple landing - just switch to manual/stabilized
         _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
         PX4_INFO("Landing mode - Switch to manual control");
         break;
-        
+
     default:
         break;
     }
