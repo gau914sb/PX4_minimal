@@ -1,0 +1,100 @@
+-- PX4_GIT_TAG: v1.16.0-rc1-667-g71d292ed6b
+CMake Warning (dev) at CMakeLists.txt:176 (find_package):
+  Policy CMP0148 is not set: The FindPythonInterp and FindPythonLibs modules
+  are removed.  Run "cmake --help-policy CMP0148" for policy details.  Use
+  the cmake_policy command to set the policy and suppress this warning.
+
+This warning is for project developers.  Use -Wno-dev to suppress it.
+
+-- Found PythonInterp: /usr/local/bin/python3 (found suitable version "3.13.2", minimum required is "3")
+-- PX4 config file: /Users/gauravsinghbhati/Documents/PX4-Autopilot/boards/px4/sitl/default.px4board
+-- PLATFORM posix
+-- ROMFSROOT px4fmu_common
+-- TESTING y
+-- ETHERNET y
+-- ROOT_PATH .
+-- PARAM_FILE /fs/mtd_params
+-- PX4 config: px4_sitl_default
+-- PX4 platform: posix
+-- PX4 lockstep: enabled
+-- The CXX compiler identification is AppleClang 17.0.0.17000319
+-- The C compiler identification is AppleClang 17.0.0.17000319
+-- The ASM compiler identification is AppleClang
+-- Found assembler: /usr/bin/cc
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- cmake build type: RelWithDebInfo
+-- ccache enabled (export CCACHE_DISABLE=1 to disable)
+CMake Deprecation Warning at platforms/posix/src/px4/common/lockstep_scheduler/CMakeLists.txt:1 (cmake_minimum_required):
+  Compatibility with CMake < 3.10 will be removed from a future version of
+  CMake.
+
+  Update the VERSION argument <min> value.  Or, use the <min>...<max> syntax
+  to tell CMake that the project requires at least <min> but has been updated
+  to work with policies introduced by <max> or earlier.
+
+
+-- Could NOT find gz-transport (missing: gz-transport_DIR)
+-- Gazebo simulation bridge module disabled: missing dependencies
+-- Found Protobuf: /usr/local/lib/libprotobuf.dylib (found version "6.32.0")
+-- Could NOT find gz-transport (missing: gz-transport_DIR)
+-- Could NOT find gz-sim (missing: gz-sim_DIR)
+-- Could NOT find gz-sensors (missing: gz-sensors_DIR)
+-- Could NOT find gz-plugin (missing: gz-plugin_DIR)
+-- Found Java: /Library/Java/JavaVirtualMachines/temurin-24.jdk/Contents/Home/bin/java (found version "24.0.1")
+-- ROMFS: ROMFS/px4fmu_common
+-- Configuring done (15.0s)
+-- Generating done (0.7s)
+-- Build files have been written to: /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default
+[0/733] git submodule src/modules/mavlink/mavlink
+[7/733] Running cpp protocol buffer compiler on /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/gz_msgs/opticalflow.proto
+[9/733] Building CXX object src/modules/simulation/gz_msgs/CMakeFiles/px4_gz_msgs.dir/opticalflow.pb.cc.o
+[10/733] Linking CXX static library src/modules/simulation/gz_msgs/libpx4_gz_msgs.a
+[11/733] Generating px4 event header file
+[12/733] Generating actuators.json
+[13/733] Generating serial_params.c
+[14/733] Generating Mavlink uAvionix: src/modules/mavlink/mavlink/message_definitions/v1.0/uAvionix.xml
+[15/733] Generating uORB json files
+[16/733] Generating uORB topic headers
+[17/733] Building CXX object src/lib/tinybson/CMakeFiles/tinybson.dir/tinybson.cpp.o
+[18/733] Building CXX object src/lib/perf/CMakeFiles/perf.dir/perf_counter.cpp.o
+[19/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/dq_addlast.c.o
+[20/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/dq_rem.c.o
+[21/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/dq_remfirst.c.o
+[22/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/hrt_queue.c.o
+[23/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/hrt_work_cancel.c.o
+[24/733] Generating Mavlink development: src/modules/mavlink/mavlink/message_definitions/v1.0/development.xml
+[25/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/hrt_thread.c.o
+[26/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/sq_addafter.c.o
+[27/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/sq_remfirst.c.o
+[28/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/queue.c.o
+[29/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/sq_addlast.c.o
+[30/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/work_queue.c.o
+[31/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/work_cancel.c.o
+[32/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/work_lock.c.o
+[33/733] Building C object platforms/common/work_queue/CMakeFiles/work_queue.dir/work_thread.c.o
+[34/733] Building CXX object src/lib/geo/CMakeFiles/geo.dir/geo.cpp.o
+[35/733] Building CXX object src/lib/lat_lon_alt/CMakeFiles/lat_lon_alt.dir/lat_lon_alt.cpp.o
+[36/733] Generating parameters.xml
+FAILED: [code=1] parameters.xml parameters.json parameters.json.xz /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/parameters.xml /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/parameters.json /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/parameters.json.xz 
+cd /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/src/lib/parameters && /usr/local/bin/python3 /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/parameters/px_process_params.py --src-path /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/adsb /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/airspeed /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/atmosphere /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/battery /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/button /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/cdev /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/cdev/test /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/circuit_breaker /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/collision_prevention /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/control_allocation/control_allocation /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/control_allocation/actuator_effectiveness /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/controllib /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/controllib/controllib_test /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/conversion /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/dataman_client /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/accelerometer /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/device /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/gyroscope /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/led /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/magnetometer /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/rangefinder /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/smbus /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/drivers/smbus_sbs /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/heatshrink /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/hysteresis /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/led /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/mathlib /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/mixer_module /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/motion_planning /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/npfg /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/fw_performance_model /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/pid /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/pure_pursuit /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/rate_control /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/rc/rc_tests /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/ringbuffer /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/rover_control /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/rtl /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/sensor_calibration /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/slew_rate /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/stick_yaw /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/systemlib /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/system_identification /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/tecs /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/terrain_estimation /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/timesync /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/tunes /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/variable_length_ringbuffer /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/weather_vane /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/posix/src/px4/common/px4_daemon /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/posix/src/px4/common/lockstep_scheduler /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/posix/src/px4/generic/generic/tone_alarm /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/common/uORB /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/common/uORB/uORB_tests /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/common/px4_work_queue /Users/gauravsinghbhati/Documents/PX4-Autopilot/platforms/common/px4_work_queue/test /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/drivers/tone_alarm /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/attitude_estimator_q /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/control_allocator/VehicleActuatorEffectiveness /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/control_allocator /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/dataman /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/ekf2 /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/events /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/land_detector /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/load_mon /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/logger /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/manual_control /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/mavlink /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/mavlink/mavlink_tests /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/minimal_commander /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/navigator/GeofenceBreachAvoidance /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/navigator/MissionFeasibility /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/navigator /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/rc_update /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/data_validator /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_acceleration /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_imu /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_air_data /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_angular_velocity /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_gps_position /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_magnetometer /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors/vehicle_optical_flow /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/sensors /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/battery_simulator /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/pwm_out_sim /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/sensor_airspeed_sim /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/sensor_baro_sim /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/sensor_gps_sim /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/sensor_mag_sim /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/simulator_mavlink /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/simulator_sih /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/simulation/system_power_simulator /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/actuator_test /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/led_control /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/param /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/perf /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/shutdown /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/tests /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/tests/hrt_test /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/topic_listener /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/tune_control /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/uorb /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/systemcmds/ver /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/events /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/generated_params --xml /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/parameters.xml --json /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/parameters.json --compress --inject-xml /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/lib/parameters/parameters_injected.xml --overrides {} --board px4_sitl && /usr/local/bin/python3 /Users/gauravsinghbhati/Documents/PX4-Autopilot/Tools/validate_json.py --schema-file /Users/gauravsinghbhati/Documents/PX4-Autopilot/src/modules/mavlink/mavlink/component_information/parameter.schema.json /Users/gauravsinghbhati/Documents/PX4-Autopilot/build/px4_sitl_default/parameters.json --skip-if-no-schema
+Duplicate parameter definition: BAT_LOW_THR+
+[37/733] Building C object src/lib/version/CMakeFiles/version.dir/version.c.o
+[38/733] Linking CXX static library src/lib/tinybson/libtinybson.a
+[39/733] Linking CXX static library src/lib/perf/libperf.a
+[40/733] Linking C static library platforms/common/work_queue/libwork_queue.a
+[41/733] Linking CXX static library src/lib/geo/libgeo.a
+[42/733] Linking CXX static library src/lib/lat_lon_alt/liblat_lon_alt.a
+[43/733] Generating px4 event json file from source
+[44/733] Generating uORB topic sources
+[45/733] Generating uORB compressed fields
+ninja: build stopped: subcommand failed.
+make: *** [px4_sitl_default] Error 1

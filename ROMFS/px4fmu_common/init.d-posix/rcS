@@ -242,10 +242,10 @@ fi
 dataman start
 
 # only start the simulator if not in replay mode, as both control the lockstep time
-if ! replay tryapplyparams
-then
+# if ! replay tryapplyparams
+# then
 	. px4-rc.simulator
-fi
+# fi
 
 load_mon start
 
@@ -368,4 +368,4 @@ fi
 . ${R}etc/init.d/rc.logging
 
 mavlink boot_complete
-replay trystart
+# replay trystart - disabled for minimal build
