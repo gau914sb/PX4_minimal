@@ -53,12 +53,15 @@ CONFIG_MODULES_MANUAL_CONTROL=y  # REQUIRED - RC input processing
 CONFIG_MODULES_MAVLINK=y  # REQUIRED - communication with GCS
 CONFIG_MAVLINK_DIALECT="development"
 
-# Multicopter Controllers - Optional (can be enabled for full control)
-# CONFIG_MODULES_MC_ATT_CONTROL=y  # Disabled - direct rate control only
+# Multicopter Controllers - ENABLED (with required MPC_* parameters added)
+CONFIG_MODULES_MC_ATT_CONTROL=y  # ENABLED - converts attitude setpoints to rate setpoints
 # CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=y  # Disabled - no autotuning
 # CONFIG_MODULES_MC_HOVER_THRUST_ESTIMATOR=y  # Disabled - no position control
 # CONFIG_MODULES_MC_POS_CONTROL=y  # Disabled - no position control
-# CONFIG_MODULES_MC_RATE_CONTROL=y  # Disabled - direct motor control
+CONFIG_MODULES_MC_RATE_CONTROL=y  # ENABLED - converts rate setpoints to actuator commands
+#
+# Required parameters for MC controllers are defined in:
+# src/modules/minimal_commander/mc_control_params.c
 
 # Navigation - Keep for land_detector dependency
 CONFIG_MODULES_NAVIGATOR=y  # Keep - required by land_detector

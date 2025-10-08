@@ -259,3 +259,18 @@ PARAM_DEFINE_INT32(COM_FLTMODE5, -1);
  * @value 10 Takeoff
  */
 PARAM_DEFINE_INT32(COM_FLTMODE6, -1);
+
+/**
+ * Motor spoolup time
+ *
+ * The minimal time from arming the motors until moving the vehicle is possible.
+ * Goal: Motors and propellers spool up to idle speed before getting commanded to spin faster
+ *
+ * @group Commander
+ * @min 0
+ * @max 30
+ * @decimal 1
+ * @increment 0.1
+ * @unit s
+ */
+PARAM_DEFINE_FLOAT(COM_SPOOLUP_TIME, 1.0f);
