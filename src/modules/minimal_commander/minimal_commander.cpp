@@ -158,12 +158,28 @@ void MinimalCommander::Run()
 void MinimalCommander::process_commands()
 {
     // Process vehicle commands (ARM/DISARM via MAVLink)
+    static uint64_t last_log_time = 0;
+    static int command_count = 0;
+
+    // Log every 5 seconds to confirm this function is being called
+    uint64_t now = hrt_absolute_time();
+    if (now - last_log_time > 5_s) {
+        PX4_INFO("process_commands() alive - checking for commands...");
+        last_log_time = now;
+    }
+
     vehicle_command_s cmd;
     if (_vehicle_command_sub.update(&cmd)) {
+        command_count++;
+        PX4_INFO(">>> COMMAND RECEIVED #%d: cmd=%d, target_sys=%d, target_comp=%d, param1=%.2f <<<",
+                 command_count, cmd.command, cmd.target_system, cmd.target_component, (double)cmd.param1);
 
         switch (cmd.command) {
-        case vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM:
-            if (cmd.param1 > 0.5f) {
+        case vehicle_command_s::VEHICLE_CMD_COMPONENT_ARM_DISARM: {
+            const int8_t arming_action = static_cast<int8_t>(lroundf(cmd.param1));
+            PX4_INFO("ARM/DISARM command: action=%d, current_state=%d", arming_action, (int)_state);
+
+            if (arming_action == vehicle_command_s::ARMING_ACTION_ARM) {
                 // ARM command - Check state transition validity AND minimal safety
                 if (_state == MinimalCommanderState::DISARMED) {
                     if (MinimalStateMachine::can_transition(_state, MinimalCommanderState::ARMED)) {
@@ -181,15 +197,26 @@ void MinimalCommander::process_commands()
                         PX4_WARN("Invalid state transition");
                         answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_DENIED);
                     }
+                } else {
+                    PX4_WARN("Arming BLOCKED - Already armed or not in DISARMED state");
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_DENIED);
                 }
-            } else {
+            } else if (arming_action == vehicle_command_s::ARMING_ACTION_DISARM) {
                 // DISARM command
                 if (MinimalStateMachine::requires_disarm(_state)) {
                     _state = MinimalCommanderState::DISARMED;
                     PX4_INFO("DISARMED via command");
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
+                } else {
+                    PX4_WARN("DISARM command ignored - already disarmed");
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_DENIED);
                 }
+            } else {
+                PX4_WARN("Invalid arming action: %d", arming_action);
+                answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_DENIED);
             }
             break;
+        }
 
         case vehicle_command_s::VEHICLE_CMD_DO_FLIGHTTERMINATION:
             _state = MinimalCommanderState::EMERGENCY;
@@ -255,8 +282,10 @@ void MinimalCommander::process_takeoff_land_commands(const vehicle_command_s &cm
     case vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF:
         if (_state == MinimalCommanderState::ARMED) {
             handle_takeoff_command();
+            answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
         } else {
             PX4_WARN("Takeoff rejected - Vehicle not armed");
+            answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_DENIED);
         }
         break;
 
@@ -264,6 +293,7 @@ void MinimalCommander::process_takeoff_land_commands(const vehicle_command_s &cm
         // Simple landing - just switch to manual/stabilized
         _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
         PX4_INFO("Landing mode - Switch to manual control");
+        answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
         break;
 
     default:
@@ -449,6 +479,111 @@ MinimalCommander *MinimalCommander::instantiate(int argc, char *argv[])
 
 int MinimalCommander::custom_command(int argc, char *argv[])
 {
+    if (!is_running()) {
+        PX4_ERR("minimal_commander is not running");
+        return 1;
+    }
+
+    MinimalCommander *instance = get_instance();
+
+    if (argc < 1) {
+        return print_usage("missing command");
+    }
+
+    // ARM command
+    if (!strcmp(argv[0], "arm")) {
+        if (instance->_state == MinimalCommanderState::DISARMED) {
+            if (MinimalStateMachine::can_transition(instance->_state, MinimalCommanderState::ARMED)) {
+                if (instance->_safety_checks.checkAndUpdateArmingState()) {
+                    instance->_state = MinimalCommanderState::ARMED;
+                    instance->_armed_timestamp = hrt_absolute_time();
+                    instance->_arm_disarm_cycles++;
+                    PX4_INFO("✅ ARMED via console command");
+                    return 0;
+                } else {
+                    PX4_WARN("❌ Arming BLOCKED - Essential safety check failed");
+                    return 1;
+                }
+            } else {
+                PX4_WARN("❌ Invalid state transition");
+                return 1;
+            }
+        } else {
+            PX4_WARN("❌ Already armed or not in DISARMED state");
+            return 1;
+        }
+    }
+
+    // DISARM command
+    if (!strcmp(argv[0], "disarm")) {
+        if (MinimalStateMachine::requires_disarm(instance->_state)) {
+            instance->_state = MinimalCommanderState::DISARMED;
+            PX4_INFO("✅ DISARMED via console command");
+            return 0;
+        } else {
+            PX4_WARN("❌ Already disarmed");
+            return 1;
+        }
+    }
+
+    // TAKEOFF command
+    if (!strcmp(argv[0], "takeoff")) {
+        if (instance->_state == MinimalCommanderState::ARMED) {
+            instance->_vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_OFFBOARD;
+            PX4_INFO("✅ TAKEOFF mode enabled - External controller active");
+            PX4_INFO("   Send offboard setpoints (attitude/thrust) to control the vehicle");
+            return 0;
+        } else {
+            PX4_WARN("❌ Takeoff rejected - Vehicle not armed");
+            PX4_WARN("   Run: minimal_commander arm");
+            return 1;
+        }
+    }
+
+    // STATUS command (detailed status)
+    if (!strcmp(argv[0], "status")) {
+        PX4_INFO("=== Minimal Commander Status ===");
+
+        // State
+        const char *state_str = "UNKNOWN";
+        switch (instance->_state) {
+            case MinimalCommanderState::INIT: state_str = "INIT"; break;
+            case MinimalCommanderState::DISARMED: state_str = "DISARMED"; break;
+            case MinimalCommanderState::ARMED: state_str = "ARMED"; break;
+            case MinimalCommanderState::EMERGENCY: state_str = "EMERGENCY"; break;
+        }
+        PX4_INFO("State: %s", state_str);
+
+        // Nav state
+        const char *nav_state_str = "UNKNOWN";
+        switch (instance->_vehicle_status.nav_state) {
+            case vehicle_status_s::NAVIGATION_STATE_MANUAL: nav_state_str = "MANUAL"; break;
+            case vehicle_status_s::NAVIGATION_STATE_OFFBOARD: nav_state_str = "OFFBOARD"; break;
+            case vehicle_status_s::NAVIGATION_STATE_AUTO_TAKEOFF: nav_state_str = "AUTO_TAKEOFF"; break;
+            case vehicle_status_s::NAVIGATION_STATE_AUTO_LAND: nav_state_str = "AUTO_LAND"; break;
+        }
+        PX4_INFO("Navigation: %s", nav_state_str);
+
+        // Battery
+        battery_status_s battery;
+        if (instance->_battery_status_sub.copy(&battery)) {
+            PX4_INFO("Battery: %.2fV (%.1f%%)",
+                     (double)battery.voltage_v,
+                     (double)(battery.remaining * 100.0f));
+        }
+
+        // Statistics
+        PX4_INFO("Arm/Disarm cycles: %d", instance->_arm_disarm_cycles);
+        PX4_INFO("Emergency stops: %d", instance->_emergency_stops);
+
+        if (instance->_armed_timestamp > 0 && instance->_state == MinimalCommanderState::ARMED) {
+            uint64_t armed_duration_ms = (hrt_absolute_time() - instance->_armed_timestamp) / 1000;
+            PX4_INFO("Armed for: %llu ms", armed_duration_ms);
+        }
+
+        return 0;
+    }
+
     return print_usage("unknown command");
 }
 
@@ -474,20 +609,34 @@ The minimal commander:
 - Enables offboard and manual control
 - Auto-arms on offboard commands
 - Supports RC stick arming/disarming
+- Provides console commands for direct control
 
 ### Examples
 Start the minimal commander:
 $ minimal_commander start
 
+Arm the vehicle:
+$ minimal_commander arm
+
+Takeoff (enables offboard mode):
+$ minimal_commander takeoff
+
+Check detailed status:
+$ minimal_commander status
+
+Disarm the vehicle:
+$ minimal_commander disarm
+
 Stop the minimal commander:
 $ minimal_commander stop
-
-Check status:
-$ minimal_commander status
 )DESCR_STR");
 
     PRINT_MODULE_USAGE_NAME("minimal_commander", "system");
     PRINT_MODULE_USAGE_COMMAND("start");
+    PRINT_MODULE_USAGE_COMMAND_DESCR("arm", "Arm the vehicle");
+    PRINT_MODULE_USAGE_COMMAND_DESCR("disarm", "Disarm the vehicle");
+    PRINT_MODULE_USAGE_COMMAND_DESCR("takeoff", "Enable takeoff/offboard mode");
+    PRINT_MODULE_USAGE_COMMAND_DESCR("status", "Show detailed status");
     PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
 
     return 0;

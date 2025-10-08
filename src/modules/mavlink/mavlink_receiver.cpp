@@ -465,6 +465,10 @@ MavlinkReceiver::handle_message_command_long(mavlink_message_t *msg)
 	mavlink_command_long_t cmd_mavlink;
 	mavlink_msg_command_long_decode(msg, &cmd_mavlink);
 
+	PX4_INFO(">>> MAVLINK COMMAND_LONG: cmd=%d, from=%d/%d, to=%d/%d, param1=%.2f",
+	         cmd_mavlink.command, msg->sysid, msg->compid,
+	         cmd_mavlink.target_system, cmd_mavlink.target_component, (double)cmd_mavlink.param1);
+
 	vehicle_command_s vcmd{};
 
 	vcmd.timestamp = hrt_absolute_time();
