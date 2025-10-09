@@ -51,6 +51,27 @@
 
 using namespace time_literals;
 
+// MAVLink mode flag constants (from MAVLink standard)
+constexpr uint8_t VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED  = 1;   // 0b00000001
+constexpr uint8_t VEHICLE_MODE_FLAG_TEST_ENABLED         = 2;   // 0b00000010
+constexpr uint8_t VEHICLE_MODE_FLAG_AUTO_ENABLED         = 4;   // 0b00000100
+constexpr uint8_t VEHICLE_MODE_FLAG_GUIDED_ENABLED       = 8;   // 0b00001000
+constexpr uint8_t VEHICLE_MODE_FLAG_STABILIZE_ENABLED    = 16;  // 0b00010000
+constexpr uint8_t VEHICLE_MODE_FLAG_HIL_ENABLED          = 32;  // 0b00100000
+constexpr uint8_t VEHICLE_MODE_FLAG_MANUAL_INPUT_ENABLED = 64;  // 0b01000000
+constexpr uint8_t VEHICLE_MODE_FLAG_SAFETY_ARMED         = 128; // 0b10000000
+
+// PX4 custom main mode constants (from px4_custom_mode.h)
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_MANUAL     = 1;
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_ALTCTL     = 2;
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_POSCTL     = 3;
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_AUTO       = 4;
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_ACRO       = 5;
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_OFFBOARD   = 6;
+constexpr uint8_t PX4_CUSTOM_MAIN_MODE_STABILIZED = 7;
+
+using namespace time_literals;
+
 // Static state machine helper class
 class MinimalStateMachine {
 public:
@@ -224,6 +245,41 @@ void MinimalCommander::process_commands()
             PX4_WARN("EMERGENCY STOP activated");
             break;
 
+        case vehicle_command_s::VEHICLE_CMD_DO_SET_MODE: {
+            // Handle mode change commands (e.g., OFFBOARD mode)
+            uint8_t base_mode = (uint8_t)cmd.param1;
+            uint32_t custom_mode = (uint32_t)cmd.param2;
+            
+            PX4_INFO("SET_MODE command: base_mode=%d, custom_mode=%d", base_mode, custom_mode);
+            
+            // Check if custom mode is enabled
+            if (base_mode & VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED) {
+                // Handle PX4 custom modes
+                if (custom_mode == PX4_CUSTOM_MAIN_MODE_OFFBOARD) {
+                    _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_OFFBOARD;
+                    PX4_INFO("Switched to OFFBOARD mode - External control active");
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
+                } else if (custom_mode == PX4_CUSTOM_MAIN_MODE_MANUAL) {
+                    _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+                    PX4_INFO("Switched to MANUAL mode");
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
+                } else if (custom_mode == PX4_CUSTOM_MAIN_MODE_STABILIZED) {
+                    _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_STAB;
+                    PX4_INFO("Switched to STABILIZED mode");
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
+                } else {
+                    // Other custom modes - default to MANUAL for safety
+                    _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
+                    PX4_INFO("Unsupported custom mode %d, defaulting to MANUAL", custom_mode);
+                    answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_ACCEPTED);
+                }
+            } else {
+                PX4_WARN("Non-custom mode not supported");
+                answer_command(cmd, vehicle_command_ack_s::VEHICLE_CMD_RESULT_UNSUPPORTED);
+            }
+            break;
+        }
+
         case vehicle_command_s::VEHICLE_CMD_NAV_TAKEOFF:
         case vehicle_command_s::VEHICLE_CMD_NAV_LAND:
             process_takeoff_land_commands(cmd);
@@ -396,6 +452,8 @@ void MinimalCommander::publish_status()
     status.system_id = 1;
     status.component_id = 1;
     status.vehicle_type = vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
+    status.is_vtol = false;  // CRITICAL: Must be false for regular multicopter!
+    status.is_vtol_tailsitter = false;
 
     // Set failsafe status based on battery
     status.failsafe = (_battery_warning >= battery_status_s::WARNING_LOW);
@@ -412,20 +470,100 @@ void MinimalCommander::publish_status()
 
     _actuator_armed_pub.publish(armed);
 
-    // Publish vehicle control mode
+    // Publish vehicle control mode - Use proper mode-based flag setting
     vehicle_control_mode_s control_mode{};
     control_mode.timestamp = now;
     control_mode.flag_armed = MinimalStateMachine::is_armed(_state);
-    control_mode.flag_control_manual_enabled = false;
-    control_mode.flag_control_auto_enabled = false;
-    control_mode.flag_control_offboard_enabled =
-        (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_OFFBOARD);
-    control_mode.flag_control_rates_enabled = true;
-    control_mode.flag_control_attitude_enabled = false;
-    control_mode.flag_control_position_enabled = false;
-    control_mode.flag_control_velocity_enabled = false;
-    control_mode.flag_control_altitude_enabled = false;
-    control_mode.flag_control_climb_rate_enabled = false;
+    
+    // Set control mode flags based on navigation state
+    switch (_vehicle_status.nav_state) {
+    case vehicle_status_s::NAVIGATION_STATE_MANUAL:
+        control_mode.flag_control_manual_enabled = true;
+        control_mode.flag_control_attitude_enabled = true;
+        control_mode.flag_control_rates_enabled = true;
+        control_mode.flag_control_allocation_enabled = true;
+        break;
+
+    case vehicle_status_s::NAVIGATION_STATE_STAB:
+        control_mode.flag_control_manual_enabled = true;
+        control_mode.flag_control_attitude_enabled = true;
+        control_mode.flag_control_rates_enabled = true;
+        control_mode.flag_control_allocation_enabled = true;
+        break;
+
+    case vehicle_status_s::NAVIGATION_STATE_OFFBOARD:
+        control_mode.flag_control_offboard_enabled = true;
+        
+        // Get latest offboard_control_mode to determine what's being controlled
+        offboard_control_mode_s offboard_mode;
+        if (_offboard_control_mode_sub.copy(&offboard_mode)) {
+            // DEBUG: Log what offboard mode flags are set
+            static hrt_abstime last_debug_log = 0;
+            if (hrt_elapsed_time(&last_debug_log) > 2_s) {
+                PX4_INFO("OFFBOARD flags: pos=%d vel=%d acc=%d att=%d rate=%d thrust=%d",
+                         offboard_mode.position, offboard_mode.velocity, offboard_mode.acceleration,
+                         offboard_mode.attitude, offboard_mode.body_rate, offboard_mode.thrust_and_torque);
+                PX4_INFO("→ Setting control_mode flags based on offboard_mode.attitude=%d", offboard_mode.attitude);
+                last_debug_log = hrt_absolute_time();
+            }
+            
+            if (offboard_mode.position) {
+                control_mode.flag_control_position_enabled = true;
+                control_mode.flag_control_velocity_enabled = true;
+                control_mode.flag_control_altitude_enabled = true;
+                control_mode.flag_control_climb_rate_enabled = true;
+                control_mode.flag_control_acceleration_enabled = true;
+                control_mode.flag_control_attitude_enabled = true;
+                control_mode.flag_control_rates_enabled = true;
+                control_mode.flag_control_allocation_enabled = true;
+            } else if (offboard_mode.velocity) {
+                control_mode.flag_control_velocity_enabled = true;
+                control_mode.flag_control_altitude_enabled = true;
+                control_mode.flag_control_climb_rate_enabled = true;
+                control_mode.flag_control_acceleration_enabled = true;
+                control_mode.flag_control_attitude_enabled = true;
+                control_mode.flag_control_rates_enabled = true;
+                control_mode.flag_control_allocation_enabled = true;
+            } else if (offboard_mode.acceleration) {
+                control_mode.flag_control_acceleration_enabled = true;
+                control_mode.flag_control_attitude_enabled = true;
+                control_mode.flag_control_rates_enabled = true;
+                control_mode.flag_control_allocation_enabled = true;
+            } else if (offboard_mode.attitude) {
+                control_mode.flag_control_attitude_enabled = true;
+                control_mode.flag_control_rates_enabled = true;
+                control_mode.flag_control_allocation_enabled = true;
+                
+                // DEBUG: Confirm flags are set
+                static hrt_abstime last_att_log = 0;
+                if (hrt_elapsed_time(&last_att_log) > 2_s) {
+                    PX4_INFO("→ ATTITUDE mode: attitude=%d rates=%d allocation=%d",
+                             control_mode.flag_control_attitude_enabled,
+                             control_mode.flag_control_rates_enabled,
+                             control_mode.flag_control_allocation_enabled);
+                    last_att_log = hrt_absolute_time();
+                }
+            } else if (offboard_mode.body_rate) {
+                control_mode.flag_control_rates_enabled = true;
+                control_mode.flag_control_allocation_enabled = true;
+            } else if (offboard_mode.thrust_and_torque) {
+                control_mode.flag_control_allocation_enabled = true;
+            }
+        }
+        break;
+
+    case vehicle_status_s::NAVIGATION_STATE_ACRO:
+        control_mode.flag_control_manual_enabled = true;
+        control_mode.flag_control_rates_enabled = true;
+        control_mode.flag_control_allocation_enabled = true;
+        break;
+
+    default:
+        // Safe defaults
+        control_mode.flag_control_rates_enabled = true;
+        control_mode.flag_control_allocation_enabled = true;
+        break;
+    }
 
     _vehicle_control_mode_pub.publish(control_mode);
 }

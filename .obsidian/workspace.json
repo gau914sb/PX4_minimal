@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "64238eb53316c833",
+        "id": "d312bb850153e2d5",
         "type": "tabs",
         "children": [
           {
-            "id": "23fe2e7031201d89",
+            "id": "791b957d22e37cb0",
             "type": "leaf",
             "state": {
               "type": "markdown",
               "state": {
-                "file": "PARAMETER_DEPENDENCY_ANALYSIS.md",
-                "mode": "preview",
+                "file": "QUICK_START.md",
+                "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "PARAMETER_DEPENDENCY_ANALYSIS"
+              "title": "QUICK_START"
             }
           }
         ]
@@ -170,20 +170,30 @@
       "bases:Create new base": false
     }
   },
-  "active": "23fe2e7031201d89",
+  "active": "791b957d22e37cb0",
   "lastOpenFiles": [
+    "build/px4_sitl_default/src/modules/minimal_commander/CMakeFiles/modules__minimal_commander.dir/minimal_commander.cpp.o.d",
+    "build/px4_sitl_default/src/modules/minimal_commander/CMakeFiles/modules__minimal_commander.dir/minimal_commander.cpp-17ef3b1f.o.tmp",
+    "build/px4_sitl_default/rootfs/log/2025-10-08/17_19_57.ulg",
+    "build/px4_sitl_default/rootfs/log/2025-10-08/17_17_41.ulg",
+    "build/px4_sitl_default/src/modules/minimal_commander/CMakeFiles/modules__minimal_commander.dir/minimal_commander.cpp-993159f5.o.tmp",
+    "px4_interdependencies.md",
     "QUICK_START.md",
+    "FIXES_APPLIED_SUMMARY.md",
+    "FEEDBACK_FEATURES.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "build/px4_sitl_default/src/modules/minimal_commander/CMakeFiles/modules__minimal_commander.dir/minimal_commander.cpp-bed60275.o.tmp",
+    "check_mavlink_attitude.py",
+    "debug_topics.sh",
+    "build/px4_sitl_default/rootfs/log/2025-10-08/17_06_52.ulg",
+    "build/px4_sitl_default/src/modules/mavlink/CMakeFiles/modules__mavlink.dir/open_drone_id_translations.cpp.o.d",
+    "build/px4_sitl_default/src/modules/minimal_commander/CMakeFiles/modules__minimal_commander.dir/minimal_commander.cpp-1587c054.o.tmp",
+    "MISSING_FEATURES_ANALYSIS.md",
+    "PARAMETER_DEPENDENCY_ANALYSIS.md",
+    "ATTITUDE_CONTROL_FIX.md",
+    "TEST_SCRIPT_UPDATES.md",
     "BUILD_SUCCESS_SUMMARY.md",
-    "build/px4_sitl_default/bin/px4",
-    "build/px4_sitl_default/src/modules/simulation/simulator_mavlink/libmodules__simulation__simulator_mavlink.a",
-    "build/px4_sitl_default/src/modules/simulation/simulator_mavlink/CMakeFiles/modules__simulation__simulator_mavlink.dir/SimulatorMavlink.cpp.o",
-    "build/px4_sitl_default/src/modules/simulation/simulator_mavlink/CMakeFiles/modules__simulation__simulator_mavlink.dir/SimulatorMavlink.cpp.o.d",
-    "build/px4_sitl_default/src/modules/simulation/simulator_sih/libmodules__simulation__simulator_sih.a",
-    "build/px4_sitl_default/src/modules/simulation/simulator_sih/CMakeFiles/modules__simulation__simulator_sih.dir/sih.cpp.o",
-    "build/px4_sitl_default/src/modules/simulation/simulator_sih/CMakeFiles/modules__simulation__simulator_sih.dir/sih.cpp.o.d",
-    "build/px4_sitl_default/platforms/posix/CMakeFiles/px4.dir/apps.cpp.o",
-    "build/px4_sitl_default/platforms/posix/CMakeFiles/px4.dir/apps.cpp.o.d",
-    "build/px4_sitl_default/src/systemcmds/ver/libsystemcmds__ver.a",
     "src/modules/minimal_commander/GAPS_AND_LOOPHOLES_ANALYSIS.md",
     "src/modules/minimal_commander/CONSOLE_COMMANDS.md",
     "src/modules/minimal_commander/IIT-Mumbai-EV-Powertrain-lab-pic-2-1024x576.jpeg",
@@ -207,16 +217,6 @@
     "src/modules/mavlink/mavlink/pymavlink/generator/javascript/local_modules/README.md",
     "src/modules/mavlink/mavlink/pymavlink/generator/swift/README.md",
     "src/modules/mavlink/mavlink/pymavlink/generator/javascript_stable/README.md",
-    "src/modules/mavlink/mavlink/pymavlink/generator/javascript/README.md",
-    "src/modules/mavlink/mavlink/pymavlink/examples/README.md",
-    "src/modules/mavlink/mavlink/pymavlink/README.md",
-    "src/modules/mavlink/mavlink/examples/c/README.md",
-    "src/modules/mavlink/mavlink/doc/README.md",
-    "src/modules/mavlink/mavlink/README.md",
-    "src/modules/mavlink/mavlink/CONTRIBUTING.md",
-    "src/lib/heatshrink/heatshrink/README.md",
-    "src/lib/heatshrink/heatshrink/CONTRIBUTING.md",
-    "src/modules/minimal_commander/COMMANDER_DEPENDENCY_ANALYSIS.md",
-    "src/modules/minimal_commander/MINIMAL_BUILD_CONFIGURATION.md"
+    "src/modules/mavlink/mavlink/pymavlink/generator/javascript/README.md"
   ]
 }

@@ -262,6 +262,13 @@ manual_control start
 sensors start
 minimal_commander start
 
+# Start Control Allocator (must be before controllers)
+control_allocator start
+
+# Start MC attitude and rate controllers
+mc_att_control start
+mc_rate_control start
+
 #
 # state estimator selection
 if param compare -s EKF2_EN 1

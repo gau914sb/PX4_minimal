@@ -7,6 +7,8 @@
 
 . ${R}etc/init.d/rc.mc_defaults
 
+# Set MAV_TYPE for quadrotor (needed for thrust conversion in mavlink_receiver)
+param set-default MAV_TYPE 2
 
 param set-default CA_AIRFRAME 0
 
