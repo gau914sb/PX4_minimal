@@ -265,8 +265,8 @@ minimal_commander start
 # Start Control Allocator (must be before controllers)
 control_allocator start
 
-# Start MC attitude and rate controllers
-mc_att_control start
+# Start MC rate controller only (attitude controller removed)
+# mc_att_control start  # DISABLED - removed from build
 mc_rate_control start
 
 #

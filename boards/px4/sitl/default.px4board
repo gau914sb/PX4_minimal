@@ -53,8 +53,8 @@ CONFIG_MODULES_MANUAL_CONTROL=y  # REQUIRED - RC input processing
 CONFIG_MODULES_MAVLINK=y  # REQUIRED - communication with GCS
 CONFIG_MAVLINK_DIALECT="development"
 
-# Multicopter Controllers - ENABLED (with required MPC_* parameters added)
-CONFIG_MODULES_MC_ATT_CONTROL=y  # ENABLED - converts attitude setpoints to rate setpoints
+# Multicopter Controllers - Rate control only (attitude controller removed)
+# CONFIG_MODULES_MC_ATT_CONTROL=y  # DISABLED - removed, will use direct rate control
 # CONFIG_MODULES_MC_AUTOTUNE_ATTITUDE_CONTROL=y  # Disabled - no autotuning
 # CONFIG_MODULES_MC_HOVER_THRUST_ESTIMATOR=y  # Disabled - no position control
 # CONFIG_MODULES_MC_POS_CONTROL=y  # Disabled - no position control
