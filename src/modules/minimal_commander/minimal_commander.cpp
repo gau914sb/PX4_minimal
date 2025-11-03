@@ -249,9 +249,9 @@ void MinimalCommander::process_commands()
             // Handle mode change commands (e.g., OFFBOARD mode)
             uint8_t base_mode = (uint8_t)cmd.param1;
             uint32_t custom_mode = (uint32_t)cmd.param2;
-            
+
             PX4_INFO("SET_MODE command: base_mode=%d, custom_mode=%d", base_mode, custom_mode);
-            
+
             // Check if custom mode is enabled
             if (base_mode & VEHICLE_MODE_FLAG_CUSTOM_MODE_ENABLED) {
                 // Handle PX4 custom modes
@@ -474,7 +474,7 @@ void MinimalCommander::publish_status()
     vehicle_control_mode_s control_mode{};
     control_mode.timestamp = now;
     control_mode.flag_armed = MinimalStateMachine::is_armed(_state);
-    
+
     // Set control mode flags based on navigation state
     switch (_vehicle_status.nav_state) {
     case vehicle_status_s::NAVIGATION_STATE_MANUAL:
@@ -493,7 +493,7 @@ void MinimalCommander::publish_status()
 
     case vehicle_status_s::NAVIGATION_STATE_OFFBOARD:
         control_mode.flag_control_offboard_enabled = true;
-        
+
         // Get latest offboard_control_mode to determine what's being controlled
         offboard_control_mode_s offboard_mode;
         if (_offboard_control_mode_sub.copy(&offboard_mode)) {
@@ -506,7 +506,7 @@ void MinimalCommander::publish_status()
                 PX4_INFO("→ Setting control_mode flags based on offboard_mode.attitude=%d", offboard_mode.attitude);
                 last_debug_log = hrt_absolute_time();
             }
-            
+
             if (offboard_mode.position) {
                 control_mode.flag_control_position_enabled = true;
                 control_mode.flag_control_velocity_enabled = true;
@@ -533,7 +533,7 @@ void MinimalCommander::publish_status()
                 control_mode.flag_control_attitude_enabled = true;
                 control_mode.flag_control_rates_enabled = true;
                 control_mode.flag_control_allocation_enabled = true;
-                
+
                 // DEBUG: Confirm flags are set
                 static hrt_abstime last_att_log = 0;
                 if (hrt_elapsed_time(&last_att_log) > 2_s) {

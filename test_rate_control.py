@@ -55,7 +55,7 @@ def arm():
     if is_armed():
         print("\n[1/4] Vehicle is already ARMED ✓")
         return
-    
+
     print("\n[1/4] Arming vehicle...")
     master.mav.command_long_send(
         master.target_system,
@@ -66,7 +66,7 @@ def arm():
         0, 0, 0, 0, 0, 0
     )
     time.sleep(2)
-    
+
     if is_armed():
         print("✓ Vehicle ARMED successfully")
     else:
@@ -81,12 +81,12 @@ def set_mode_offboard():
     print(f"  Bit 0 (ignore roll rate): {bool(RATE_TARGET_TYPEMASK & 1)}")
     print(f"  Bit 1 (ignore pitch rate): {bool(RATE_TARGET_TYPEMASK & 2)}")
     print(f"  Bit 2 (ignore yaw rate): {bool(RATE_TARGET_TYPEMASK & 4)}")
-    
+
     # Pre-send setpoints at high rate (PX4 requires >2Hz stream before accepting OFFBOARD)
     start_time = time.time()
     for i in range(50):  # 50 messages at 50Hz = 1 second
         time_boot_ms = int((time.time() - start_time) * 1000) % 4294967295
-        
+
         # Zero rates with hover thrust
         master.mav.set_attitude_target_send(
             time_boot_ms,
@@ -98,7 +98,7 @@ def set_mode_offboard():
             0.5  # Thrust (0-1, normalized)
         )
         time.sleep(0.02)  # 50 Hz
-    
+
     # Now switch to OFFBOARD mode
     master.mav.command_long_send(
         master.target_system,
@@ -109,13 +109,13 @@ def set_mode_offboard():
         6,  # PX4 OFFBOARD mode
         0, 0, 0, 0, 0
     )
-    
+
     ack = master.recv_match(type='COMMAND_ACK', blocking=True, timeout=3)
     if ack and ack.command == mavutil.mavlink.MAV_CMD_DO_SET_MODE:
         print(f"✓ OFFBOARD mode set")
     else:
         print(f"⚠ No acknowledgment for OFFBOARD mode")
-    
+
     time.sleep(0.1)
 
 def get_attitude_and_rates():
@@ -142,26 +142,26 @@ def get_motor_outputs():
 def test_rate_control():
     """Test rate control by sending different rate commands with real-time feedback"""
     print("\n[3/4] Testing rate control with feedback...")
-    
+
     # Test 1: Hover with zero rates
     print("\n=== TEST 1: Hover (zero rates, 3 seconds) ===")
     print("Format: [Setpoint rates → Actual rates] | Attitude | Motors")
     print("-" * 80)
-    
+
     start_time = time.time()
     test_duration = 3
     message_count = 0
-    
+
     while time.time() - start_time < test_duration:
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         # Zero angular rates
         roll_rate = 0.0
         pitch_rate = 0.0
         yaw_rate = 0.0
         thrust = 0.5
-        
+
         # Send rate command
         master.mav.set_attitude_target_send(
             time_boot_ms,
@@ -172,36 +172,36 @@ def test_rate_control():
             roll_rate, pitch_rate, yaw_rate,
             thrust
         )
-        
+
         # Get feedback
         feedback = get_attitude_and_rates()
         motors = get_motor_outputs()
-        
+
         if feedback and message_count % 5 == 0:  # Print every 5th message (10 Hz)
             print(f"[{elapsed:.1f}s] Setpoint: R={math.degrees(roll_rate):5.1f}° P={math.degrees(pitch_rate):5.1f}° Y={math.degrees(yaw_rate):5.1f}° → "
                   f"Actual: R={feedback['rollspeed']:5.1f}°/s P={feedback['pitchspeed']:5.1f}°/s Y={feedback['yawspeed']:5.1f}°/s | "
                   f"Att: R={feedback['roll']:5.1f}° P={feedback['pitch']:5.1f}° Y={feedback['yaw']:5.1f}° | "
                   f"Motors: {motors if motors else 'N/A'}")
-        
+
         message_count += 1
         time.sleep(0.02)  # 50 Hz
-    
+
     print(f"✓ Test 1 complete ({message_count} messages sent)")
-    
+
     # Test 2: Constant yaw rate
     print("\n=== TEST 2: Constant Yaw Rate (30 deg/s, 6 seconds) ===")
     yaw_rate_deg = 30.0
     yaw_rate_rad = math.radians(yaw_rate_deg)
-    
+
     start_time = time.time()
     test_duration = 6
     message_count = 0
     yaw_measurements = []
-    
+
     while time.time() - start_time < test_duration:
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         # Constant yaw rate
         master.mav.set_attitude_target_send(
             time_boot_ms,
@@ -212,11 +212,11 @@ def test_rate_control():
             0, 0, yaw_rate_rad,
             0.5
         )
-        
+
         # Get feedback
         feedback = get_attitude_and_rates()
         motors = get_motor_outputs()
-        
+
         if feedback:
             yaw_measurements.append({
                 'time': elapsed,
@@ -224,17 +224,17 @@ def test_rate_control():
                 'actual': feedback['yawspeed'],
                 'yaw_angle': feedback['yaw']
             })
-            
+
             if message_count % 10 == 0:  # Print every 10th message (5 Hz)
                 error = abs(yaw_rate_deg - feedback['yawspeed'])
                 print(f"[{elapsed:.1f}s] Yaw rate: {yaw_rate_deg:5.1f}°/s → {feedback['yawspeed']:5.1f}°/s "
                       f"(error: {error:.1f}°/s) | Yaw: {feedback['yaw']:6.1f}° | Motors: {motors if motors else 'N/A'}")
-        
+
         message_count += 1
         time.sleep(0.02)  # 50 Hz
-    
+
     print(f"✓ Test 2 complete ({message_count} messages sent)")
-    
+
     # Analyze yaw rate tracking
     if yaw_measurements:
         errors = [abs(m['setpoint'] - m['actual']) for m in yaw_measurements]
@@ -242,22 +242,22 @@ def test_rate_control():
         max_error = max(errors)
         print(f"  Average tracking error: {avg_error:.2f} deg/s")
         print(f"  Maximum tracking error: {max_error:.2f} deg/s")
-    
+
     # Test 3: Varying yaw rate (sine wave)
     print("\n=== TEST 3: Varying Yaw Rate (Sine wave, 6 seconds) ===")
-    
+
     start_time = time.time()
     test_duration = 6
     message_count = 0
-    
+
     while time.time() - start_time < test_duration:
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         # Sinusoidal yaw rate: amplitude=45 deg/s, period=3 seconds
         yaw_rate_deg = 45.0 * math.sin(2 * math.pi * elapsed / 3.0)
         yaw_rate_rad = math.radians(yaw_rate_deg)
-        
+
         master.mav.set_attitude_target_send(
             time_boot_ms,
             master.target_system,
@@ -267,33 +267,33 @@ def test_rate_control():
             0, 0, yaw_rate_rad,
             0.5
         )
-        
+
         feedback = get_attitude_and_rates()
-        
+
         if feedback and message_count % 10 == 0:
             print(f"[{elapsed:.1f}s] Yaw rate: {yaw_rate_deg:6.1f}°/s → {feedback['yawspeed']:6.1f}°/s | "
                   f"Yaw: {feedback['yaw']:6.1f}°")
-        
+
         message_count += 1
         time.sleep(0.02)  # 50 Hz
-    
+
     print(f"✓ Test 3 complete ({message_count} messages sent)")
-    
+
     # Test 4: Roll and pitch rates
     print("\n=== TEST 4: Roll and Pitch Rates (20 deg/s each, 4 seconds) ===")
-    
+
     start_time = time.time()
     test_duration = 4
     message_count = 0
-    
+
     while time.time() - start_time < test_duration:
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         # Constant roll and pitch rates
         roll_rate_rad = math.radians(20.0)
         pitch_rate_rad = math.radians(20.0)
-        
+
         master.mav.set_attitude_target_send(
             time_boot_ms,
             master.target_system,
@@ -303,27 +303,27 @@ def test_rate_control():
             roll_rate_rad, pitch_rate_rad, 0,
             0.5
         )
-        
+
         feedback = get_attitude_and_rates()
-        
+
         if feedback and message_count % 10 == 0:
             print(f"[{elapsed:.1f}s] Rates - R: {feedback['rollspeed']:5.1f}°/s P: {feedback['pitchspeed']:5.1f}°/s Y: {feedback['yawspeed']:5.1f}°/s | "
                   f"Att - R: {feedback['roll']:5.1f}° P: {feedback['pitch']:5.1f}° Y: {feedback['yaw']:6.1f}°")
-        
+
         message_count += 1
         time.sleep(0.02)  # 50 Hz
-    
+
     print(f"✓ Test 4 complete ({message_count} messages sent)")
-    
+
     # Return to hover
     print("\n=== Returning to hover (zero rates, 2 seconds) ===")
     start_time = time.time()
     message_count = 0
-    
+
     while time.time() - start_time < 2:
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         master.mav.set_attitude_target_send(
             time_boot_ms,
             master.target_system,
@@ -333,16 +333,16 @@ def test_rate_control():
             0, 0, 0,
             0.5
         )
-        
+
         message_count += 1
         time.sleep(0.02)
-    
+
     print(f"✓ Hover complete ({message_count} messages sent)")
 
 def read_final_status():
     """Read final motor outputs and battery status"""
     print("\n[4/4] Final Status Check...")
-    
+
     # Get motor outputs
     motors = get_motor_outputs()
     if motors:
@@ -351,7 +351,7 @@ def read_final_status():
         print(f"  Normalized thrust: {[f'{t:.3f}' for t in thrust_values]}")
     else:
         print("⚠ Could not read motor outputs")
-    
+
     # Get battery status
     msg = master.recv_match(type='BATTERY_STATUS', blocking=True, timeout=2)
     if msg:

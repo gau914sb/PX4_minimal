@@ -11,7 +11,7 @@ from pymavlink import mavutil
 # Constants for SET_ATTITUDE_TARGET message
 # Bit mask to indicate which fields should be ignored by the vehicle
 # Bit 1: Ignore body roll rate
-# Bit 2: Ignore body pitch rate  
+# Bit 2: Ignore body pitch rate
 # Bit 3: Ignore body yaw rate
 ATTITUDE_TARGET_TYPEMASK = 0b00000111  # Ignore body rates, use attitude + thrust
 
@@ -60,7 +60,7 @@ def arm():
     if is_armed():
         print("\n[1/4] Vehicle is already ARMED ✓")
         return
-    
+
     print("\n[1/4] Arming vehicle...")
     master.mav.command_long_send(
         master.target_system,
@@ -71,7 +71,7 @@ def arm():
         0, 0, 0, 0, 0, 0
     )
     time.sleep(2)
-    
+
     # Verify armed status
     if is_armed():
         print("✓ Vehicle ARMED successfully")
@@ -82,16 +82,16 @@ def set_mode_offboard():
     """Set OFFBOARD mode (required for external attitude control)"""
     print("\n[2/5] Setting OFFBOARD mode...")
     print("  Sending initial setpoints to enable OFFBOARD...")
-    
+
     # Pre-send setpoints at high rate (PX4 requires >2Hz stream before accepting OFFBOARD)
     # We send at 50Hz for 1 second to establish the stream
     start_time = time.time()
     for i in range(50):  # 50 messages at 50Hz = 1 second
         time_boot_ms = int((time.time() - start_time) * 1000) % 4294967295
-        
+
         # Level attitude (quaternion for roll=0, pitch=0, yaw=0)
         q = [1.0, 0.0, 0.0, 0.0]  # w, x, y, z
-        
+
         master.mav.set_attitude_target_send(
             time_boot_ms,
             master.target_system,
@@ -102,7 +102,7 @@ def set_mode_offboard():
             0.5  # Thrust (0-1, normalized)
         )
         time.sleep(0.02)  # 50 Hz (20ms interval)
-    
+
     # Now switch to OFFBOARD mode (custom_mode = 6 for PX4)
     master.mav.command_long_send(
         master.target_system,
@@ -113,26 +113,26 @@ def set_mode_offboard():
         6,  # PX4 OFFBOARD mode
         0, 0, 0, 0, 0
     )
-    
+
     ack = master.recv_match(type='COMMAND_ACK', blocking=True, timeout=3)
     if ack and ack.command == mavutil.mavlink.MAV_CMD_DO_SET_MODE:
         print(f"✓ OFFBOARD mode command sent")
     else:
         print(f"⚠ No acknowledgment for OFFBOARD mode")
-    
+
     time.sleep(0.1)
 
 def takeoff(altitude=2.5):
     """Command takeoff by sending attitude + thrust commands"""
     print(f"\n[3/5] Taking off to {altitude}m using attitude control...")
     print("  Sending level attitude with increasing thrust...")
-    
+
     # Send level attitude with hover thrust for 5 seconds at 50Hz
     start_time = time.time()
     while time.time() - start_time < 5:
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         # Level attitude (no rotation)
         master.mav.set_attitude_target_send(
             time_boot_ms,
@@ -144,7 +144,7 @@ def takeoff(altitude=2.5):
             0.6  # 60% thrust for takeoff
         )
         time.sleep(0.02)  # 50 Hz - CRITICAL for preventing timeout
-    
+
     print("✓ Takeoff thrust applied")
 
 def send_attitude_setpoint(roll, pitch, yaw, thrust):
@@ -165,31 +165,31 @@ def test_attitude_control():
     print("Sending attitude setpoints for 10 seconds...")
     print("\nFormat: [Setpoint → Actual] Roll | Pitch | Yaw | Thrust")
     print("-" * 70)
-    
+
     # Convert degrees to radians for quaternion
     test_duration = 10
     start_time = time.time()
     last_feedback_time = 0
-    
+
     while time.time() - start_time < test_duration:
         elapsed = time.time() - start_time
-        
+
         # Vary yaw angle over time
         yaw_deg = (elapsed * 36) % 360  # 36 deg/sec rotation
         yaw_rad = math.radians(yaw_deg)
-        
+
         # Convert to quaternion (simplified - just yaw rotation)
         qw = math.cos(yaw_rad / 2)
         qx = 0
         qy = 0
         qz = math.sin(yaw_rad / 2)
-        
+
         # Send attitude command
         thrust_setpoint = 0.5  # 50% thrust
-        
+
         # Calculate timestamp in milliseconds (use elapsed time to avoid overflow)
         time_boot_ms = int((time.time() - start_time) * 1000) % 4294967295
-        
+
         master.mav.set_attitude_target_send(
             time_boot_ms,
             master.target_system,
@@ -199,7 +199,7 @@ def test_attitude_control():
             0, 0, 0,
             thrust_setpoint
         )
-        
+
         # Get feedback at 2Hz (every 0.5 seconds)
         if time.time() - last_feedback_time >= 0.5:
             # Try to get ATTITUDE message
@@ -208,27 +208,27 @@ def test_attitude_control():
                 actual_roll = math.degrees(msg.roll)
                 actual_pitch = math.degrees(msg.pitch)
                 actual_yaw = math.degrees(msg.yaw)
-                
+
                 # Get thrust feedback from SERVO_OUTPUT_RAW (actual motor outputs)
                 servo_msg = master.recv_match(type='SERVO_OUTPUT_RAW', blocking=False)
                 if servo_msg:
                     # Average the motor outputs (servo1-4) and normalize to 0-1 range
                     # PWM range is typically 1000-2000, so normalize around 1500
-                    avg_pwm = (servo_msg.servo1_raw + servo_msg.servo2_raw + 
+                    avg_pwm = (servo_msg.servo1_raw + servo_msg.servo2_raw +
                               servo_msg.servo3_raw + servo_msg.servo4_raw) / 4.0
                     # Convert PWM (1000-2000) to normalized thrust (0-1)
                     actual_thrust = (avg_pwm - 1000) / 1000.0
                 else:
                     actual_thrust = 0.0
-                
+
                 print(f"  [{yaw_deg:6.1f}° → {actual_yaw:6.1f}°] "
                       f"R:{actual_roll:6.2f}° P:{actual_pitch:6.2f}° Y:{actual_yaw:6.2f}° "
                       f"T:{actual_thrust:.2f}")
-                
+
                 last_feedback_time = time.time()
-        
+
         time.sleep(0.02)  # 50 Hz - CRITICAL: Must be >2Hz to prevent timeout
-    
+
     print("-" * 70)
     print("✓ Attitude commands sent for 10 seconds with real-time feedback")
 
@@ -237,15 +237,15 @@ def monitor_attitude():
     print("\n[5/5] Monitoring detailed attitude response...")
     print("Format: Roll | Pitch | Yaw | Roll Rate | Pitch Rate | Yaw Rate")
     print("-" * 80)
-    
+
     start_time = time.time()
     attitude_count = 0
-    
+
     while time.time() - start_time < 5:
         # CRITICAL: Keep sending commands to prevent timeout
         elapsed = time.time() - start_time
         time_boot_ms = int(elapsed * 1000) % 4294967295
-        
+
         # Send level hover attitude
         master.mav.set_attitude_target_send(
             time_boot_ms,
@@ -256,7 +256,7 @@ def monitor_attitude():
             0, 0, 0,
             0.5  # 50% hover thrust
         )
-        
+
         # Get attitude feedback
         msg = master.recv_match(type='ATTITUDE', blocking=False, timeout=0.01)
         if msg:
@@ -267,20 +267,20 @@ def monitor_attitude():
             rollspeed_deg = math.degrees(msg.rollspeed)
             pitchspeed_deg = math.degrees(msg.pitchspeed)
             yawspeed_deg = math.degrees(msg.yawspeed)
-            
+
             if attitude_count % 5 == 0:  # Print every 5th message for readability
                 print(f"  R:{roll_deg:7.2f}° P:{pitch_deg:7.2f}° Y:{yaw_deg:7.2f}° | "
                       f"R':{rollspeed_deg:6.1f}°/s P':{pitchspeed_deg:6.1f}°/s Y':{yawspeed_deg:6.1f}°/s")
-        
+
         time.sleep(0.02)  # 50 Hz
-    
+
     print("-" * 80)
     print(f"✓ Received {attitude_count} attitude messages (~{attitude_count/5:.0f} Hz)")
 
 def get_servo_output():
     """Get servo/actuator output to show thrust feedback"""
     print("\n[BONUS] Checking actuator outputs...")
-    
+
     # Request SERVO_OUTPUT_RAW message
     msg = master.recv_match(type='SERVO_OUTPUT_RAW', blocking=True, timeout=2)
     if msg:
@@ -300,7 +300,7 @@ def disarm():
     if not is_armed():
         print("\n[6/5] Vehicle is already DISARMED ✓")
         return
-    
+
     print("\n[6/5] Disarming vehicle...")
     master.mav.command_long_send(
         master.target_system,
@@ -311,7 +311,7 @@ def disarm():
         0, 0, 0, 0, 0, 0
     )
     time.sleep(1)
-    
+
     # Verify disarmed status
     if not is_armed():
         print("✓ Vehicle DISARMED successfully")
@@ -319,16 +319,16 @@ def disarm():
         print("⚠ Disarm command sent, but vehicle may still be armed")
 
 if __name__ == "__main__":
-    
+
     print("\n" + "="*60)
     print("PX4 ATTITUDE CONTROL TEST")
     print("="*60)
-    
+
     # Check initial armed state
     print("\nChecking initial vehicle state...")
     initial_armed = is_armed()
     print(f"Initial state: {'ARMED ⚠' if initial_armed else 'DISARMED ✓'}")
-    
+
     try:
         arm()
         set_mode_offboard()
@@ -337,7 +337,7 @@ if __name__ == "__main__":
         monitor_attitude()
         get_servo_output()
         disarm()
-        
+
         print("\n" + "="*60)
         print("✓ TEST COMPLETE!")
         print("="*60)
@@ -347,7 +347,7 @@ if __name__ == "__main__":
         print("  ✓ Servo/motor outputs checked")
         print("\nIf you see changing attitude values above, the attitude controller is working!")
         print("Check the PX4 console for mc_att_control and mc_rate_control status.")
-        
+
     except KeyboardInterrupt:
         print("\n\nTest interrupted by user")
         disarm()

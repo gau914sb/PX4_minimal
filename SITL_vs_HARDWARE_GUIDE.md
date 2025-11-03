@@ -112,7 +112,7 @@ gps start -d /dev/ttyS1          # GPS on UART1 (optional)
 # Start sensors module
 sensors start
 
-# Start EKF2 estimator  
+# Start EKF2 estimator
 ekf2 start
 
 # Start minimal commander
@@ -167,19 +167,19 @@ bool check_safety() {
         PX4_ERR("Battery voltage too low: %.2fV", _battery_status.voltage_v);
         return false;
     }
-    
+
     // Check IMU calibration
     if (!_sensor_gyro_valid || !_sensor_accel_valid) {
         PX4_ERR("IMU not calibrated or invalid");
         return false;
     }
-    
+
     // Check RC or offboard connection
     if (!_offboard_control_mode_valid) {
         PX4_ERR("No offboard control input");
         return false;
     }
-    
+
     return true;
 }
 ```
