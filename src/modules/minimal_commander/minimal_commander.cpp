@@ -44,6 +44,7 @@
 
 #include "minimal_commander.hpp"
 
+#include <lib/mathlib/mathlib.h>
 #include <px4_platform_common/events.h>
 #include <px4_platform_common/px4_config.h>
 #include <px4_platform_common/log.h>
@@ -145,8 +146,14 @@ int MinimalCommander::init()
     _vehicle_status.arming_state = vehicle_status_s::ARMING_STATE_DISARMED;
     _vehicle_status.nav_state = vehicle_status_s::NAVIGATION_STATE_MANUAL;
 
-    // Schedule the first run
-    ScheduleOnInterval(100_ms); // Run at 10 Hz
+    // Schedule the first run - Use parameter for configurable update rate
+    // Default: 20ms (50 Hz) - Good balance of responsiveness and efficiency
+    // Can be changed via COM_MINCMD_RATE parameter (10-1000ms)
+    const int32_t update_rate_ms = _param_com_mincmd_rate.get();
+    const uint32_t update_rate_us = math::constrain(update_rate_ms, 10, 1000) * 1000;
+    ScheduleOnInterval(update_rate_us);
+    PX4_INFO("Minimal Commander scheduled at %d Hz (%d ms interval)",
+             1000 / update_rate_ms, update_rate_ms);
 
     return PX4_OK;
 }

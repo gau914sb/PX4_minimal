@@ -1,0 +1,898 @@
+================================================================================
+           MINIMAL COMMANDER - COMPLETE OPERATIONAL FLOWCHART
+================================================================================
+
+================================================================================
+PART 1: MODULE LIFECYCLE (From Start to Stop)
+================================================================================
+
+                            ┌─────────────────┐
+                            │  USER COMMAND   │
+                            │ minimal_commander│
+                            │     start       │
+                            └────────┬────────┘
+                                     │
+                                     ▼
+                        ┌────────────────────────┐
+                        │  task_spawn()          │
+                        │  (Static method)       │
+                        └────────┬───────────────┘
+                                 │
+                                 │ Allocate memory
+                                 ▼
+                   ┌──────────────────────────────────┐
+                   │  new MinimalCommander()          │
+                   │  *** CONSTRUCTOR CALLED ***      │
+                   └───────────┬──────────────────────┘
+                               │
+                ┌──────────────┴──────────────┐
+                │  CONSTRUCTOR EXECUTION      │
+                ├─────────────────────────────┤
+                │  1. ModuleParams(nullptr)   │
+                │  2. ScheduledWorkItem(...)  │
+                │  3. _state = INIT           │
+                │  4. Initialize members:     │
+                │     - _armed_timestamp = 0  │
+                │     - _arm_disarm_cycles = 0│
+                │     - _emergency_stops = 0  │
+                │  5. Create subscribers:     │
+                │     - vehicle_command       │
+                │     - battery_status        │
+                │     - offboard_control_mode │
+                │     - manual_control        │
+                │  6. Create publishers:      │
+                │     - vehicle_status        │
+                │     - actuator_armed        │
+                │     - vehicle_control_mode  │
+                │  7. perf_alloc(_loop_perf)  │
+                └─────────────┬───────────────┘
+                              │
+                              │ Constructor complete
+                              ▼
+                   ┌──────────────────────┐
+                   │  init() called       │
+                   └──────────┬───────────┘
+                              │
+               ┌──────────────┴──────────────┐
+               │  INITIALIZATION             │
+               ├─────────────────────────────┤
+               │  1. _state: INIT → DISARMED │
+               │  2. Initialize vehicle_status│
+               │     - system_type = ROTARY  │
+               │     - arming_state = DISARM │
+               │     - nav_state = MANUAL    │
+               │  3. ScheduleOnInterval(100ms)│
+               │     → Register with work    │
+               │       queue at 10 Hz        │
+               └──────────────┬──────────────┘
+                              │
+                              │ Initialization complete
+                              ▼
+               ╔══════════════════════════════╗
+               ║   MAIN RUNTIME LOOP          ║
+               ║   (10 Hz - every 100ms)      ║
+               ╚══════════════╤═══════════════╝
+                              │
+                              │ Work queue calls Run()
+                              ▼
+            ┌──────────────────────────────────────┐
+            │          Run() Entry                 │
+            └──────────────────┬───────────────────┘
+                               │
+                               ▼
+                    ┌──────────────────┐
+                    │ should_exit()?   │
+                    └────┬────────┬────┘
+                         │        │
+                    NO   │        │ YES
+                         │        ▼
+                         │    ┌────────────────┐
+                         │    │ ScheduleClear()│
+                         │    │ exit_and       │
+                         │    │ _cleanup()     │
+                         │    └───────┬────────┘
+                         │            │
+                         │            ▼
+                         │    ┌───────────────────────┐
+                         │    │ ~MinimalCommander()   │
+                         │    │ *** DESTRUCTOR ***    │
+                         │    ├───────────────────────┤
+                         │    │ perf_free(_loop_perf) │
+                         │    │ Auto-destruct members │
+                         │    └───────┬───────────────┘
+                         │            │
+                         │            ▼
+                         │       ┌─────────┐
+                         │       │  EXIT   │
+                         │       └─────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  perf_begin(_loop_perf)    │ ← Start performance timer
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  Check parameter updates   │
+            │  _parameter_update_sub     │
+            │  .update()                 │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  STEP 1:                   │
+            │  process_commands()        │
+            │  [See PART 2 below]        │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  STEP 2:                   │
+            │  check_offboard_timeout()  │
+            │  [See PART 3 below]        │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  STEP 3:                   │
+            │  check_battery_status()    │
+            │  [See PART 4 below]        │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  STEP 4:                   │
+            │  publish_status()          │
+            │  [See PART 5 below]        │
+            └────────────┬───────────────┘
+                         │
+                         ▼
+            ┌────────────────────────────┐
+            │  perf_end(_loop_perf)      │ ← End performance timer
+            └────────────┬───────────────┘
+                         │
+                         │ Return to work queue
+                         ▼
+                    Wait 100ms
+                         │
+                         └──> Loop back to Run()
+
+
+================================================================================
+PART 2: process_commands() - Detailed Flow
+================================================================================
+
+                ┌─────────────────────────┐
+                │  process_commands()     │
+                │  Entry                  │
+                └────────┬────────────────┘
+                         │
+                         ▼
+        ┌────────────────────────────────────────┐
+        │  LOG: "process_commands() alive..."    │
+        │  (Every 5 seconds)                     │
+        └────────┬───────────────────────────────┘
+                 │
+                 ▼
+        ┌─────────────────────────────┐
+        │  Check vehicle_command_sub  │
+        │  .update(&cmd)              │
+        └─────┬───────────────┬───────┘
+              │               │
+         NO   │               │ YES - New command!
+              │               │
+              │               ▼
+              │    ┌──────────────────────────────┐
+              │    │ LOG: Command details         │
+              │    │ cmd=%d, params=%.2f          │
+              │    └──────┬───────────────────────┘
+              │           │
+              │           ▼
+              │    ┌──────────────────────────────┐
+              │    │ Switch(cmd.command)          │
+              │    └──┬───┬───┬───┬───┬───────────┘
+              │       │   │   │   │   │
+              │       │   │   │   │   └─> Other commands
+              │       │   │   │   │       (ignored)
+              │       │   │   │   │
+              │       │   │   │   └──> VEHICLE_CMD_NAV_TAKEOFF
+              │       │   │   │        VEHICLE_CMD_NAV_LAND
+              │       │   │   │        └─> process_takeoff_land_commands()
+              │       │   │   │
+              │       │   │   └──> VEHICLE_CMD_DO_SET_MODE
+              │       │   │        │
+              │       │   │        ▼
+              │       │   │   ┌────────────────────────┐
+              │       │   │   │ Extract base_mode,     │
+              │       │   │   │         custom_mode    │
+              │       │   │   └───┬────────────────────┘
+              │       │   │       │
+              │       │   │       ▼
+              │       │   │   ┌────────────────────────┐
+              │       │   │   │ Switch(custom_mode)    │
+              │       │   │   └┬──┬──┬──┬─────────────┘
+              │       │   │    │  │  │  │
+              │       │   │    │  │  │  └─> PX4_CUSTOM_MAIN_MODE_OFFBOARD (6)
+              │       │   │    │  │  │      └─> nav_state = OFFBOARD
+              │       │   │    │  │  │          ACK: ACCEPTED
+              │       │   │    │  │  │
+              │       │   │    │  │  └─> PX4_CUSTOM_MAIN_MODE_MANUAL (1)
+              │       │   │    │  │      └─> nav_state = MANUAL
+              │       │   │    │  │          ACK: ACCEPTED
+              │       │   │    │  │
+              │       │   │    │  └─> PX4_CUSTOM_MAIN_MODE_STABILIZED (7)
+              │       │   │    │      └─> nav_state = STAB
+              │       │   │    │          ACK: ACCEPTED
+              │       │   │    │
+              │       │   │    └─> DEFAULT
+              │       │   │        └─> nav_state = MANUAL (safe default)
+              │       │   │            ACK: ACCEPTED
+              │       │   │
+              │       │   └──> VEHICLE_CMD_DO_FLIGHTTERMINATION
+              │       │        │
+              │       │        ▼
+              │       │   ┌────────────────────────┐
+              │       │   │ _state = EMERGENCY     │
+              │       │   │ _emergency_stops++     │
+              │       │   │ LOG: "EMERGENCY STOP"  │
+              │       │   └────────────────────────┘
+              │       │
+              │       └──> VEHICLE_CMD_COMPONENT_ARM_DISARM
+              │            │
+              │            ▼
+              │       ┌────────────────────────────┐
+              │       │ arming_action =            │
+              │       │   (int8_t)cmd.param1       │
+              │       └───┬────────────────────────┘
+              │           │
+              │           ├──> ARMING_ACTION_ARM (1)
+              │           │    │
+              │           │    ▼
+              │           │  ┌─────────────────────┐
+              │           │  │ Current state?      │
+              │           │  └┬────────────────────┘
+              │           │   │
+              │           │   ├─> DISARMED?
+              │           │   │   │
+              │           │   │   ▼
+              │           │   │ ┌─────────────────────────────┐
+              │           │   │ │ can_transition(DISARMED,    │
+              │           │   │ │                ARMED)?      │
+              │           │   │ └─┬───────────────────────────┘
+              │           │   │   │
+              │           │   │   ├─> YES
+              │           │   │   │   │
+              │           │   │   │   ▼
+              │           │   │   │ ┌────────────────────────────┐
+              │           │   │   │ │ _safety_checks.            │
+              │           │   │   │ │ checkAndUpdateArmingState()│
+              │           │   │   │ └─┬──────────────────────────┘
+              │           │   │   │   │
+              │           │   │   │   ├─> PASS
+              │           │   │   │   │   │
+              │           │   │   │   │   ▼
+              │           │   │   │   │ ┌──────────────────────┐
+              │           │   │   │   │ │ _state = ARMED       │
+              │           │   │   │   │ │ _armed_timestamp = now│
+              │           │   │   │   │ │ _arm_disarm_cycles++ │
+              │           │   │   │   │ │ LOG: "ARMED"         │
+              │           │   │   │   │ │ answer_command(      │
+              │           │   │   │   │ │   ACCEPTED)          │
+              │           │   │   │   │ └──────────────────────┘
+              │           │   │   │   │
+              │           │   │   │   └─> FAIL
+              │           │   │   │       │
+              │           │   │   │       ▼
+              │           │   │   │     ┌──────────────────────┐
+              │           │   │   │     │ WARN: "Safety failed"│
+              │           │   │   │     │ answer_command(      │
+              │           │   │   │     │   TEMP_REJECTED)     │
+              │           │   │   │     └──────────────────────┘
+              │           │   │   │
+              │           │   │   └─> NO (invalid transition)
+              │           │   │       │
+              │           │   │       ▼
+              │           │   │     ┌──────────────────────┐
+              │           │   │     │ WARN: "Invalid state"│
+              │           │   │     │ answer_command(DENIED)│
+              │           │   │     └──────────────────────┘
+              │           │   │
+              │           │   └─> NOT DISARMED
+              │           │       │
+              │           │       ▼
+              │           │     ┌──────────────────────┐
+              │           │     │ WARN: "Already armed"│
+              │           │     │ answer_command(DENIED)│
+              │           │     └──────────────────────┘
+              │           │
+              │           └──> ARMING_ACTION_DISARM (0)
+              │                │
+              │                ▼
+              │           ┌──────────────────────────┐
+              │           │ requires_disarm(_state)? │
+              │           │ (ARMED or EMERGENCY?)    │
+              │           └─┬────────────────────────┘
+              │             │
+              │             ├─> YES
+              │             │   │
+              │             │   ▼
+              │             │ ┌──────────────────────┐
+              │             │ │ _state = DISARMED    │
+              │             │ │ LOG: "DISARMED"      │
+              │             │ │ answer_command(      │
+              │             │ │   ACCEPTED)          │
+              │             │ └──────────────────────┘
+              │             │
+              │             └─> NO
+              │                 │
+              │                 ▼
+              │               ┌──────────────────────┐
+              │               │ WARN: "Already       │
+              │               │       disarmed"      │
+              │               │ answer_command(DENIED)│
+              │               └──────────────────────┘
+              │
+              ▼
+        ┌─────────────────────────────┐
+        │ Check offboard_control_mode │
+        │ _sub.update(&offboard_mode) │
+        └─────┬───────────────┬───────┘
+              │               │
+         NO   │               │ YES - Offboard active!
+              │               │
+              │               ▼
+              │    ┌──────────────────────────────┐
+              │    │ _last_offboard_timestamp = now│
+              │    └──────┬───────────────────────┘
+              │           │
+              │           ▼
+              │    ┌──────────────────────────────┐
+              │    │ State == DISARMED?           │
+              │    └──┬───────────────────────────┘
+              │       │
+              │  NO   │               │ YES
+              │       │               │
+              │       │               ▼
+              │       │    ┌──────────────────────────────┐
+              │       │    │ (attitude || body_rate)?     │
+              │       │    └──┬───────────────────────────┘
+              │       │       │
+              │       │  NO   │               │ YES
+              │       │       │               │
+              │       │       │               ▼
+              │       │       │    ┌──────────────────────────────┐
+              │       │       │    │ _safety_checks.              │
+              │       │       │    │ checkAndUpdateArmingState()? │
+              │       │       │    └──┬───────────────────────────┘
+              │       │       │       │
+              │       │       │  FAIL │        │ PASS
+              │       │       │       │        │
+              │       │       │       │        ▼
+              │       │       │       │  ┌────────────────────┐
+              │       │       │       │  │ _state = ARMED     │
+              │       │       │       │  │ _armed_timestamp   │
+              │       │       │       │  │ _arm_disarm_cycles++│
+              │       │       │       │  │ LOG: "ARMED via    │
+              │       │       │       │  │  offboard control" │
+              │       │       │       │  └────────────────────┘
+              │       │       │       │
+              │       │       │       └─> WARN: "Offboard arming
+              │       │       │                   BLOCKED - Safety"
+              │       │       │
+              │       └───────┴───────────> Continue
+              │
+              ▼
+        ┌─────────────────────────────┐
+        │ Check manual_control        │
+        │ (RC stick arming/disarming) │
+        │ _sub.update(&manual_control)│
+        └─────┬───────────────┬───────┘
+              │               │
+         NO   │               │ YES - RC input!
+              │               │
+              │               ▼
+              │    ┌──────────────────────────────┐
+              │    │ Check stick positions:       │
+              │    │ - Throttle < 0.1             │
+              │    │ - Yaw > 0.8 (right)  → ARM   │
+              │    │ - Yaw < -0.8 (left)  → DISARM│
+              │    └──┬───────────────────────────┘
+              │       │
+              │       ├─> ARM DETECTED (throttle low + yaw right)
+              │       │   │
+              │       │   ▼
+              │       │ ┌──────────────────────────────┐
+              │       │ │ State == DISARMED?           │
+              │       │ └──┬───────────────────────────┘
+              │       │    │
+              │       │    └─> YES
+              │       │        │
+              │       │        ▼
+              │       │      ┌────────────────────────────┐
+              │       │      │ _safety_checks.            │
+              │       │      │ checkAndUpdateArmingState()│
+              │       │      └──┬───────────────────────┘
+              │       │         │
+              │       │    PASS │
+              │       │         │
+              │       │         ▼
+              │       │       ┌──────────────────────┐
+              │       │       │ _state = ARMED       │
+              │       │       │ LOG: "ARMED via RC"  │
+              │       │       └──────────────────────┘
+              │       │
+              │       └─> DISARM DETECTED (throttle low + yaw left)
+              │           │
+              │           ▼
+              │         ┌──────────────────────────────┐
+              │         │ is_armed(_state)?            │
+              │         └──┬───────────────────────────┘
+              │            │
+              │            └─> YES
+              │                │
+              │                ▼
+              │              ┌──────────────────────┐
+              │              │ _state = DISARMED    │
+              │              │ LOG: "DISARMED via RC"│
+              │              └──────────────────────┘
+              │
+              ▼
+        ┌──────────────┐
+        │   RETURN     │
+        └──────────────┘
+
+
+================================================================================
+PART 3: check_offboard_timeout() - Safety Timeout
+================================================================================
+
+        ┌────────────────────────────┐
+        │ check_offboard_timeout()   │
+        └────────┬───────────────────┘
+                 │
+                 ▼
+        ┌─────────────────────┐
+        │ is_armed(_state)?   │
+        └──┬──────────────────┘
+           │
+      NO   │               │ YES
+           │               │
+           │               ▼
+           │      ┌─────────────────────────────┐
+           │      │ _last_offboard_timestamp > 0?│
+           │      │ (Has offboard been used?)    │
+           │      └──┬────────────────────────┘
+           │         │
+           │    NO   │               │ YES
+           │         │               │
+           │         │               ▼
+           │         │      ┌─────────────────────────────┐
+           │         │      │ elapsed = now -             │
+           │         │      │   _last_offboard_timestamp  │
+           │         │      └──┬────────────────────────┘
+           │         │         │
+           │         │         ▼
+           │         │      ┌─────────────────────────────┐
+           │         │      │ elapsed > 500ms?            │
+           │         │      └──┬────────────────────────┘
+           │         │         │
+           │         │    NO   │               │ YES (TIMEOUT!)
+           │         │         │               │
+           │         │         │               ▼
+           │         │         │      ┌─────────────────────────────┐
+           │         │         │      │ EMERGENCY DISARM            │
+           │         │         │      │ _state = DISARMED           │
+           │         │         │      │ WARN: "Offboard timeout!"   │
+           │         │         │      │ _last_offboard_timestamp = 0│
+           │         │         │      └─────────────────────────────┘
+           │         │         │
+           └─────────┴─────────┴──────────┐
+                                          │
+                                          ▼
+                                    ┌──────────┐
+                                    │  RETURN  │
+                                    └──────────┘
+
+
+================================================================================
+PART 4: check_battery_status() - Battery Monitoring
+================================================================================
+
+        ┌────────────────────────────┐
+        │ check_battery_status()     │
+        └────────┬───────────────────┘
+                 │
+                 ▼
+        ┌─────────────────────────────┐
+        │ _battery_status_sub.update()│
+        └──┬──────────────────────────┘
+           │
+      NO   │               │ YES (new battery data)
+           │               │
+           │               ▼
+           │      ┌─────────────────────────────┐
+           │      │ _battery_warning =          │
+           │      │   battery_status.warning    │
+           │      └──┬────────────────────────┘
+           │         │
+           │         ▼
+           │      ┌─────────────────────────────┐
+           │      │ is_armed(_state)?           │
+           │      └──┬────────────────────────┘
+           │         │
+           │    NO   │               │ YES
+           │         │               │
+           │         │               ▼
+           │         │      ┌─────────────────────────────┐
+           │         │      │ _low_battery_disarm_enabled?│
+           │         │      └──┬────────────────────────┘
+           │         │         │
+           │         │    NO   │               │ YES
+           │         │         │               │
+           │         │         │               ▼
+           │         │         │      ┌─────────────────────────────┐
+           │         │         │      │ Switch(battery_status.      │
+           │         │         │      │        warning)             │
+           │         │         │      └──┬───┬───┬──────────────┘
+           │         │         │         │   │   │
+           │         │         │         │   │   └─> WARNING_NONE
+           │         │         │         │   │       WARNING_REMAINING
+           │         │         │         │   │       (Battery OK, continue)
+           │         │         │         │   │
+           │         │         │         │   └─> WARNING_LOW
+           │         │         │         │       │
+           │         │         │         │       ▼
+           │         │         │         │     ┌──────────────────────┐
+           │         │         │         │     │ AUTO DISARM          │
+           │         │         │         │     │ _state = DISARMED    │
+           │         │         │         │     │ WARN: "LOW BATTERY!" │
+           │         │         │         │     │ LOG: Voltage         │
+           │         │         │         │     └──────────────────────┘
+           │         │         │         │
+           │         │         │         └─> WARNING_CRITICAL
+           │         │         │             │
+           │         │         │             ▼
+           │         │         │           ┌──────────────────────┐
+           │         │         │           │ EMERGENCY DISARM     │
+           │         │         │           │ _state = EMERGENCY   │
+           │         │         │           │ _emergency_stops++   │
+           │         │         │           │ WARN: "CRITICAL      │
+           │         │         │           │       BATTERY!"      │
+           │         │         │           │ LOG: Voltage         │
+           │         │         │           └──────────────────────┘
+           │         │         │
+           │         └─────────┴──────────────┐
+           │                                  │
+           │                                  ▼
+           │                         ┌─────────────────────────────┐
+           │                         │ LOGGING (every 5 seconds)   │
+           │                         │ LOG: "Battery: %.2fV        │
+           │                         │       (%.1f%%)"             │
+           │                         └─────────────────────────────┘
+           │                                  │
+           └──────────────────────────────────┘
+                                              │
+                                              ▼
+                                        ┌──────────┐
+                                        │  RETURN  │
+                                        └──────────┘
+
+
+================================================================================
+PART 5: publish_status() - State Broadcasting
+================================================================================
+
+        ┌────────────────────────────┐
+        │ publish_status()           │
+        └────────┬───────────────────┘
+                 │
+                 ▼
+        ┌─────────────────────────────┐
+        │ now = hrt_absolute_time()   │
+        └────────┬────────────────────┘
+                 │
+                 ▼
+        ╔════════════════════════════════════════╗
+        ║ PUBLISH 1: vehicle_status              ║
+        ╠════════════════════════════════════════╣
+        ║ status.timestamp = now                 ║
+        ║ status.nav_state = current nav_state   ║
+        ║ status.arming_state = is_armed() ?     ║
+        ║                      ARMED : DISARMED  ║
+        ║ status.system_type = ROTARY_WING       ║
+        ║ status.is_vtol = false  ← CRITICAL!    ║
+        ║ status.failsafe = (battery_warning >= LOW)║
+        ║                                        ║
+        ║ _vehicle_status_pub.publish(status)    ║
+        ╚════════════╤═══════════════════════════╝
+                     │
+                     ▼
+        ╔════════════════════════════════════════╗
+        ║ PUBLISH 2: actuator_armed              ║
+        ╠════════════════════════════════════════╣
+        ║ armed.timestamp = now                  ║
+        ║ armed.armed = is_armed()               ║
+        ║ armed.prearmed = false                 ║
+        ║ armed.ready_to_arm = (state==DISARMED)║
+        ║ armed.lockdown = (state==EMERGENCY)    ║
+        ║                                        ║
+        ║ _actuator_armed_pub.publish(armed)     ║
+        ╚════════════╤═══════════════════════════╝
+                     │
+                     ▼
+        ╔════════════════════════════════════════╗
+        ║ PUBLISH 3: vehicle_control_mode        ║
+        ╠════════════════════════════════════════╣
+        ║ control_mode.timestamp = now           ║
+        ║ control_mode.flag_armed = is_armed()   ║
+        ║                                        ║
+        ║ Switch on nav_state:                   ║
+        ║                                        ║
+        ║ ┌─> MANUAL:                            ║
+        ║ │   flag_control_manual_enabled = true ║
+        ║ │   flag_control_attitude_enabled = true║
+        ║ │   flag_control_rates_enabled = true  ║
+        ║ │   flag_control_allocation_enabled = true║
+        ║ │                                      ║
+        ║ ┌─> STABILIZED:                        ║
+        ║ │   (Same as MANUAL)                   ║
+        ║ │                                      ║
+        ║ ┌─> OFFBOARD:                          ║
+        ║ │   flag_control_offboard_enabled = true║
+        ║ │   Get offboard_control_mode:         ║
+        ║ │   ┌─> If position:                   ║
+        ║ │   │   Set position, velocity,        ║
+        ║ │   │   altitude, climb_rate, accel,   ║
+        ║ │   │   attitude, rates, allocation    ║
+        ║ │   ┌─> If velocity:                   ║
+        ║ │   │   Set velocity, altitude,        ║
+        ║ │   │   climb_rate, accel, attitude,   ║
+        ║ │   │   rates, allocation              ║
+        ║ │   ┌─> If acceleration:               ║
+        ║ │   │   Set accel, attitude, rates,    ║
+        ║ │   │   allocation                     ║
+        ║ │   ┌─> If attitude:                   ║
+        ║ │   │   Set attitude, rates, allocation║
+        ║ │   ┌─> If body_rate:                  ║
+        ║ │   │   Set rates, allocation          ║
+        ║ │   └─> If thrust_and_torque:          ║
+        ║ │       Set allocation                 ║
+        ║ │                                      ║
+        ║ └─> ACRO:                              ║
+        ║     flag_control_manual_enabled = true ║
+        ║     flag_control_rates_enabled = true  ║
+        ║     flag_control_allocation_enabled = true║
+        ║                                        ║
+        ║ _vehicle_control_mode_pub.publish(     ║
+        ║     control_mode)                      ║
+        ╚════════════╤═══════════════════════════╝
+                     │
+                     ▼
+                ┌──────────┐
+                │  RETURN  │
+                └──────────┘
+
+
+================================================================================
+PART 6: State Machine Transitions
+================================================================================
+
+                    ┌──────────┐
+                    │   INIT   │  ← Object created in constructor
+                    └─────┬────┘
+                          │
+                          │ init() called
+                          │ (auto-transition)
+                          ▼
+                    ┌──────────┐
+               ┌────┤ DISARMED ├────┐
+               │    └──────────┘    │
+               │         ▲          │
+               │         │          │
+               │         │          │
+               │         │          │ ARM Triggers:
+               │         │          │ ✓ vehicle_command (MAVLink)
+               │         │          │ ✓ offboard_control_mode (auto-arm)
+               │         │          │ ✓ RC sticks (throttle low + yaw right)
+               │         │          │ ✓ Console: minimal_commander arm
+               │         │          │
+               │         │          │ IF safety_checks.pass():
+               │         │          │ - Battery ≥ 20% AND ≥ 10V
+               │         │          │ - 5V rail ≥ 4.5V
+               │         │          │ - E-stop not active
+               │         │          │
+               │         │          ▼
+               │         │     ┌───────┐
+               │         │     │ ARMED │
+               │         │     └───┬───┘
+               │         │         │
+               │         │         │ DISARM Triggers:
+               │         │         │ ✓ vehicle_command (MAVLink)
+               │         │         │ ✓ RC sticks (throttle low + yaw left)
+               │         │         │ ✓ Offboard timeout (>500ms)
+               │         │         │ ✓ Console: minimal_commander disarm
+               │         │         │ ✓ Low battery (auto-disarm)
+               │         │         │
+               │         └─────────┘
+               │                   │
+               │                   │ EMERGENCY Triggers:
+               │                   │ ✓ VEHICLE_CMD_DO_FLIGHTTERMINATION
+               │                   │ ✓ Critical battery (<3.0V/cell)
+               │                   │
+               │                   ▼
+               │            ┌────────────┐
+               └────────────┤ EMERGENCY  │
+                            └─────┬──────┘
+                                  │
+                                  │ Recovery:
+                                  │ ✓ Console: minimal_commander disarm
+                                  │
+                                  ▼
+                            (back to DISARMED)
+
+
+Transition Matrix (enforced by MinimalStateMachine::can_transition()):
+
+   FROM ╲ TO │  INIT  │ DISARMED │ ARMED  │ EMERGENCY │
+   ══════════╪════════╪══════════╪════════╪═══════════╡
+   INIT      │   -    │    ✓     │   ✗    │     ✗     │
+   ──────────┼────────┼──────────┼────────┼───────────┤
+   DISARMED  │   ✗    │    -     │   ✓    │     ✓     │
+   ──────────┼────────┼──────────┼────────┼───────────┤
+   ARMED     │   ✗    │    ✓     │   -    │     ✓     │
+   ──────────┼────────┼──────────┼────────┼───────────┤
+   EMERGENCY │   ✗    │    ✓     │   ✗    │     -     │
+   ══════════╧════════╧══════════╧════════╧═══════════╛
+
+
+================================================================================
+PART 7: Safety Checks Flow
+================================================================================
+
+        ┌────────────────────────────────────────┐
+        │ MinimalSafetyChecks::                  │
+        │ checkAndUpdateArmingState()            │
+        │                                        │
+        │ Called by:                             │
+        │ - vehicle_command ARM                  │
+        │ - offboard auto-arm                    │
+        │ - RC stick arming                      │
+        │ - console arm command                  │
+        └────────┬───────────────────────────────┘
+                 │
+                 ▼
+        ┌─────────────────────────────┐
+        │ CHECK 1: Battery Status     │
+        │ _battery_status_sub.copy()  │
+        └────────┬────────────────────┘
+                 │
+                 ▼
+        ┌─────────────────────────────┐
+        │ battery.remaining >= 0.20   │
+        │ (≥20%)?                     │
+        └──┬──────────────────────────┘
+           │
+      NO   │               │ YES
+           │               │
+           │               ▼
+           │      ┌─────────────────────────────┐
+           │      │ battery.voltage_v >= 10.0V? │
+           │      └──┬────────────────────────┘
+           │         │
+           │    NO   │               │ YES
+           │         │               │
+           │         │               ▼
+           │         │      ┌─────────────────────────────┐
+           │         │      │ CHECK 2: Power System       │
+           │         │      │ _system_power_sub.copy()    │
+           │         │      └──┬────────────────────────┘
+           │         │         │
+           │         │         ▼
+           │         │      ┌─────────────────────────────┐
+           │         │      │ system_power.voltage5v_v >= │
+           │         │      │ 4.5V?                       │
+           │         │      └──┬────────────────────────┘
+           │         │         │
+           │         │    NO   │               │ YES
+           │         │         │               │
+           │         │         │               ▼
+           │         │         │      ┌─────────────────────────────┐
+           │         │         │      │ CHECK 3: Emergency Stop     │
+           │         │         │      │ (Not implemented in minimal)│
+           │         │         │      └──┬────────────────────────┘
+           │         │         │         │
+           │         │         │         │ (Future: Check safety switch)
+           │         │         │         │
+           │         │         │         ▼
+           │         │         │      ┌─────────────────────────────┐
+           │         │         │      │ ALL CHECKS PASSED           │
+           │         │         │      │ return true                 │
+           │         │         │      │ (ARMING ALLOWED)            │
+           │         │         │      └─────────────────────────────┘
+           │         │         │
+           └─────────┴─────────┴──────────┐
+                                          │
+                    ANY CHECK FAILED      │
+                                          ▼
+                              ┌──────────────────────────┐
+                              │ LOG: "Essential safety   │
+                              │       check failed"      │
+                              │ return false             │
+                              │ (ARMING BLOCKED)         │
+                              └──────────────────────────┘
+
+
+================================================================================
+SUMMARY: Key Operation Points
+================================================================================
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         EXECUTION MODEL                                 │
+├────────────────────────────────────────────────────────────────────────┤
+│ • Threading: Single-threaded (work queue context)                      │
+│ • Frequency: 10 Hz (100ms cycle time)                                  │
+│ • Work Queue: nav_and_controllers                                      │
+│ • No Locks: Sequential execution guarantees                            │
+│ • Performance: Monitored via perf counters                             │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         STATE MACHINE                                   │
+├────────────────────────────────────────────────────────────────────────┤
+│ • States: 4 (INIT, DISARMED, ARMED, EMERGENCY)                        │
+│ • Transitions: Validated by MinimalStateMachine                        │
+│ • Entry Point: INIT → DISARMED (on init())                            │
+│ • Armed State: Requires safety checks                                  │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         ARMING METHODS (4)                              │
+├────────────────────────────────────────────────────────────────────────┤
+│ 1. MAVLink: VEHICLE_CMD_COMPONENT_ARM_DISARM                          │
+│ 2. Offboard: Auto-arm on offboard commands (attitude/body_rate)       │
+│ 3. RC Sticks: Throttle low + Yaw right (>0.8)                         │
+│ 4. Console: minimal_commander arm                                      │
+│                                                                         │
+│ All methods require: safety_checks.checkAndUpdateArmingState() = true │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         SAFETY CHECKS (3)                               │
+├────────────────────────────────────────────────────────────────────────┤
+│ 1. Battery: remaining ≥ 20% AND voltage ≥ 10.0V                       │
+│ 2. Power: 5V rail voltage ≥ 4.5V                                      │
+│ 3. E-Stop: Emergency stop not active (not implemented yet)            │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         AUTO-DISARM TRIGGERS                            │
+├────────────────────────────────────────────────────────────────────────┤
+│ • Offboard timeout: >500ms without offboard commands                  │
+│ • Low battery: warning level ≥ WARNING_LOW                            │
+│ • Critical battery: warning level = WARNING_CRITICAL (→ EMERGENCY)     │
+│ • RC stick disarm: Throttle low + Yaw left (<-0.8)                    │
+│ • Manual command: DISARM command or console disarm                     │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         PUBLISHED TOPICS (3)                            │
+├────────────────────────────────────────────────────────────────────────┤
+│ 1. vehicle_status: System state, arming state, nav state, failsafe    │
+│ 2. actuator_armed: Armed status, ready_to_arm, lockdown               │
+│ 3. vehicle_control_mode: Control flags based on nav_state             │
+└────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────┐
+│                         PERFORMANCE                                     │
+├────────────────────────────────────────────────────────────────────────┤
+│ • Loop Time: 100ms (10 Hz)                                            │
+│ • Offboard Timeout: 500ms                                              │
+│ • Battery Check: Every cycle (100ms)                                   │
+│ • Battery Logging: Every 5 seconds                                     │
+│ • Command Logging: Every 5 seconds ("process_commands() alive...")    │
+└────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+END OF FLOWCHART
+================================================================================

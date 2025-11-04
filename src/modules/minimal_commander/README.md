@@ -267,12 +267,12 @@ while True:
         0, 0, 0,  # body roll/pitch/yaw rates
         0.5  # thrust (0-1)
     )
-    
+
     # Send offboard_control_mode
     vehicle.mav.send(
         mavutil.mavlink.MAVLink_set_position_target_local_ned_message(...)
     )
-    
+
     time.sleep(0.1)  # 10 Hz
 ```
 

@@ -41,6 +41,25 @@
  */
 
 /**
+ * Minimal Commander update rate
+ *
+ * Execution frequency of the minimal commander main loop.
+ * Higher rates (lower interval) provide faster response to commands and safety checks.
+ * - 10 Hz (100ms): Lower CPU usage, sufficient for basic monitoring
+ * - 25 Hz (40ms): Good for most applications
+ * - 50 Hz (20ms): Faster response, recommended for offboard control
+ * - 100 Hz (10ms): Maximum responsiveness, matches full commander
+ *
+ * @group Commander
+ * @unit ms
+ * @min 10
+ * @max 1000
+ * @decimal 0
+ * @increment 10
+ */
+PARAM_DEFINE_INT32(COM_MINCMD_RATE, 20);
+
+/**
  * Manual control loss timeout
  *
  * The time in seconds without a new setpoint from RC or Joystick, after which the connection is considered lost.

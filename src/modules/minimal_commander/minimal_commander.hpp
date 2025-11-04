@@ -101,6 +101,7 @@ private:
     // Parameters (minimal set)
     DEFINE_PARAMETERS(
         (ParamInt<px4::params::COM_LOW_BAT_ACT>) _param_com_low_bat_act,
-        (ParamFloat<px4::params::BAT_LOW_THR>) _param_bat_low_thr
+        (ParamFloat<px4::params::BAT_LOW_THR>) _param_bat_low_thr,
+        (ParamInt<px4::params::COM_MINCMD_RATE>) _param_com_mincmd_rate  // Update rate in ms
     )
 };

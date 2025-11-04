@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "minimal_commander_hierarchy_mermaid.md",
-                "mode": "source",
+                "file": "src/modules/minimal_commander/OPERATION_FLOW.md",
+                "mode": "preview",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "minimal_commander_hierarchy_mermaid"
+              "title": "OPERATION_FLOW"
             }
           }
         ]
@@ -171,8 +171,9 @@
   },
   "active": "427c8f72625a6c53",
   "lastOpenFiles": [
-    "commander_hierarchy_mermaid.md",
+    "src/modules/minimal_commander/minimal_safety_checks_enhanced.cpp",
     "minimal_commander_hierarchy_mermaid.md",
+    "commander_hierarchy_mermaid.md",
     "minimal_example.mp4",
     "minimal_example.gif",
     "build/px4_sitl_default/rootfs/log/2025-10-13/15_20_30.ulg",
