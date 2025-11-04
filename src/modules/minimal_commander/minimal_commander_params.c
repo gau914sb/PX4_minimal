@@ -60,6 +60,22 @@
 PARAM_DEFINE_INT32(COM_MINCMD_RATE, 20);
 
 /**
+ * Maximum allowed CPU load for arming
+ *
+ * CPU load threshold for pre-arm safety check. Arming is blocked if
+ * CPU load exceeds this value to ensure sufficient processing power
+ * for safe operation. Set to 1.0 to disable this check.
+ *
+ * @group Commander
+ * @unit norm
+ * @min 0.5
+ * @max 1.0
+ * @decimal 2
+ * @increment 0.05
+ */
+PARAM_DEFINE_FLOAT(COM_CPU_MAX, 0.90f);
+
+/**
  * Manual control loss timeout
  *
  * The time in seconds without a new setpoint from RC or Joystick, after which the connection is considered lost.

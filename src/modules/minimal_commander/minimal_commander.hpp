@@ -63,6 +63,7 @@ private:
     void handle_takeoff_command();
     void check_battery_status();
     void check_offboard_timeout();
+    void check_runtime_safety();  // NEW: Enhanced runtime safety monitoring
     void publish_status();
     void answer_command(const vehicle_command_s &cmd, uint8_t result);
 

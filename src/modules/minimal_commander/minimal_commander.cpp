@@ -178,6 +178,7 @@ void MinimalCommander::Run()
     process_commands();
     check_offboard_timeout();
     check_battery_status();
+    check_runtime_safety();  // NEW: Enhanced runtime safety monitoring
     publish_status();
 
     perf_end(_loop_perf);
@@ -441,6 +442,42 @@ void MinimalCommander::check_battery_status()
                      battery_status.warning);
             last_battery_log = hrt_absolute_time();
         }
+    }
+}
+
+void MinimalCommander::check_runtime_safety()
+{
+    // Only check runtime safety when armed
+    if (!MinimalStateMachine::is_armed(_state)) {
+        return;
+    }
+
+    // Perform runtime safety checks
+    bool safe = _safety_checks.checkRuntimeSafety();
+
+    // Take action if safety is violated
+    if (!safe && _safety_checks.requiresEmergencyAction()) {
+        PX4_ERR("RUNTIME SAFETY VIOLATION - Emergency action required!");
+        PX4_ERR("Failed checks: 0x%08X", _safety_checks.getFailedChecks());
+        PX4_ERR("Status: %s", _safety_checks.getStatusString());
+        
+        // Trigger emergency state
+        _state = MinimalCommanderState::EMERGENCY;
+        _emergency_stops++;
+        
+        // Log the failure for diagnostics
+        static hrt_abstime last_safety_log = 0;
+        if (hrt_elapsed_time(&last_safety_log) > 1_s) {
+            PX4_ERR("Emergency triggered by runtime safety check");
+            last_safety_log = hrt_absolute_time();
+        }
+    }
+
+    // Log safety status periodically (even when OK)
+    static hrt_abstime last_ok_log = 0;
+    if (safe && hrt_elapsed_time(&last_ok_log) > 10_s) {
+        PX4_INFO("Runtime safety: OK");
+        last_ok_log = hrt_absolute_time();
     }
 }
 
