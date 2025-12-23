@@ -1,0 +1,7 @@
+# PX4 Flight Data Log
+# Test started: 2025-12-23 17:20:08
+# Columns: time_s, phase, altitude_m, altitude_error_m, velocity_z_m_s, thrust, thrust_p, thrust_i, thrust_d, integral_error, roll_deg, pitch_deg, yaw_deg, yaw_rate_deg_s
+#----------------------------------------------------------------------------------------------------
+
+# Test ended: 2025-12-23 17:20:30
+# Total duration: 22.4 seconds

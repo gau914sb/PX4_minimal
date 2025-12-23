@@ -208,16 +208,18 @@ def test_with_visualization():
 
     # Target altitude for the test
     TARGET_ALTITUDE = 3.0  # meters
-    HOVER_THRUST = 0.62  # Base hover thrust - need more to overcome gravity
-    TAKEOFF_THRUST = 0.64  # Initial takeoff thrust - higher for liftoff
+    HOVER_THRUST = 0.65  # Further increased for actual liftoff
+    TAKEOFF_THRUST = 0.65  # Same as hover
 
-    # PID altitude controller gains - very conservative for stability
-    KP_ALT_TAKEOFF = 0.04  # Small P gain to prevent overshoot
-    KI_ALT_TAKEOFF = 0.008 # Minimal integral for slow correction
-    KD_ALT_TAKEOFF = 0.15  # Strong damping to prevent oscillations
-    KP_ALT_HOVER = 0.06    # Moderate gain for altitude hold
-    KI_ALT_HOVER = 0.012   # Small integral for steady-state
-    KD_ALT_HOVER = 0.18    # Strong damping during hover
+    # REDESIGNED CONTROLLER: Reduced oscillations with lower P, higher D
+    # Base thrust: 0.65, Range: [0.30, 0.90]
+    # Half the P gain to reduce oscillations, increase D for better damping
+    KP_ALT_TAKEOFF = 0.015  # Halved from 0.03 to reduce oscillations
+    KI_ALT_TAKEOFF = 0.0    # Still disabled
+    KD_ALT_TAKEOFF = 0.08   # Increased from 0.05 for more damping
+    KP_ALT_HOVER = 0.015    # Same P gain for consistency
+    KI_ALT_HOVER = 0.0      # Still disabled
+    KD_ALT_HOVER = 0.08     # Same D gain for consistency
 
     # Phase tracking
     phase = "TAKEOFF"  # TAKEOFF or YAW_SPIN
@@ -227,8 +229,10 @@ def test_with_visualization():
     last_loop_time = time.time()
     MAX_INTEGRAL = 0.15  # Prevent integral windup
 
-    print("\n=== Phase 1: Takeoff to 3 meters ===")
-    print("Starting with higher thrust for liftoff...")
+    print("\n=== REDUCED OSCILLATIONS: Lower P, Higher D ===")
+    print("Configuration: KP=0.015, KI=0.0, KD=0.08")
+    print(f"Base thrust: {HOVER_THRUST}, Limits: [0.30, 0.90]")
+    print("Expected: Reduced oscillations, smoother control, less overshoot")
     print("Watch the altitude graph!")
 
     try:
@@ -290,11 +294,8 @@ def test_with_visualization():
             # Combined thrust
             thrust = base_thrust + thrust_p + thrust_i + thrust_d
 
-            # Much wider limits - previous 0.68 max was too low, drone couldn't lift off!
-            if phase == "TAKEOFF":
-                thrust = max(0.40, min(0.85, thrust))  # Allow high thrust for liftoff
-            else:
-                thrust = max(0.52, min(0.75, thrust))  # Moderate range for stable hover
+            # Increased base thrust (0.60) with ±0.30 authority
+            thrust = max(0.30, min(0.90, thrust))
 
             # Phase management
             if phase == "TAKEOFF":
