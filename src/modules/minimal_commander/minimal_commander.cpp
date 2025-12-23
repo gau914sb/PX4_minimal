@@ -716,7 +716,7 @@ int MinimalCommander::custom_command(int argc, char *argv[])
 
         if (instance->_armed_timestamp > 0 && instance->_state == MinimalCommanderState::ARMED) {
             uint64_t armed_duration_ms = (hrt_absolute_time() - instance->_armed_timestamp) / 1000;
-            PX4_INFO("Armed for: %llu ms", armed_duration_ms);
+            PX4_INFO("Armed for: %" PRIu64 " ms", armed_duration_ms);
         }
 
         return 0;

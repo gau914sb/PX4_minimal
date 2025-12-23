@@ -136,10 +136,10 @@ int GZBridge::init()
 		return PX4_ERROR;
 	}
 
-	// Gimbal mixing interface
+	// Gimbal mixing interface (optional - not all models have gimbals)
 	if (!_gimbal.init(_world_name, _model_name)) {
-		PX4_ERR("failed to init gimbal");
-		return PX4_ERROR;
+		PX4_WARN("Gimbal not available for this model");
+		// Don't fail - gimbal is optional
 	}
 
 	ScheduleNow();

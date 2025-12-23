@@ -6,6 +6,7 @@ Shows drone attitude, altitude, and thrust in real-time using matplotlib
 
 import time
 import math
+from datetime import datetime
 from pymavlink import mavutil
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -190,23 +191,44 @@ def test_with_visualization():
     message_count = 0
     last_update = 0
 
+    # Create timestamped log file
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    log_filename = f"flight_log_{timestamp}.txt"
+    log_file = open(log_filename, 'w')
+    print(f"\n📝 Logging flight data to: {log_filename}")
+
+    # Write header
+    log_file.write("# PX4 Flight Data Log\n")
+    log_file.write(f"# Test started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+    log_file.write("# Columns: time_s, phase, altitude_m, altitude_error_m, velocity_z_m_s, "
+                   "thrust, thrust_p, thrust_i, thrust_d, integral_error, "
+                   "roll_deg, pitch_deg, yaw_deg, yaw_rate_deg_s\n")
+    log_file.write("#" + "-"*100 + "\n")
+    log_file.flush()
+
     # Target altitude for the test
     TARGET_ALTITUDE = 3.0  # meters
-    HOVER_THRUST = 0.5  # Base hover thrust
+    HOVER_THRUST = 0.62  # Base hover thrust - need more to overcome gravity
+    TAKEOFF_THRUST = 0.64  # Initial takeoff thrust - higher for liftoff
 
-    # PD altitude controller gains (much gentler)
-    KP_ALT = 0.08  # Proportional gain for altitude control (reduced)
-    KD_ALT = 0.10  # Derivative gain for damping (velocity feedback)
+    # PID altitude controller gains - very conservative for stability
+    KP_ALT_TAKEOFF = 0.04  # Small P gain to prevent overshoot
+    KI_ALT_TAKEOFF = 0.008 # Minimal integral for slow correction
+    KD_ALT_TAKEOFF = 0.15  # Strong damping to prevent oscillations
+    KP_ALT_HOVER = 0.06    # Moderate gain for altitude hold
+    KI_ALT_HOVER = 0.012   # Small integral for steady-state
+    KD_ALT_HOVER = 0.18    # Strong damping during hover
 
     # Phase tracking
     phase = "TAKEOFF"  # TAKEOFF or YAW_SPIN
     takeoff_complete_time = None
-
-    # Previous altitude for derivative calculation
-    prev_alt = 0.0
-    prev_time = start_time
+    liftoff_detected = False  # Track when we actually leave ground
+    integral_error = 0.0  # Accumulator for integral term
+    last_loop_time = time.time()
+    MAX_INTEGRAL = 0.15  # Prevent integral windup
 
     print("\n=== Phase 1: Takeoff to 3 meters ===")
+    print("Starting with higher thrust for liftoff...")
     print("Watch the altitude graph!")
 
     try:
@@ -225,19 +247,54 @@ def test_with_visualization():
             elif altitudes:
                 current_alt = altitudes[-1]
 
-            # PD altitude controller
+            # Detect liftoff
+            if not liftoff_detected and current_alt > 0.1:
+                liftoff_detected = True
+                print(f"✓ Liftoff detected at {current_alt:.2f}m!")
+
+            # Calculate time step for integral
+            current_loop_time = time.time()
+            dt = current_loop_time - last_loop_time
+            last_loop_time = current_loop_time
+
+            # PID altitude controller with phase-dependent gains
             altitude_error = TARGET_ALTITUDE - current_alt
 
-            # Proportional term
+            # Accumulate integral error (with anti-windup)
+            integral_error += altitude_error * dt
+            integral_error = max(-MAX_INTEGRAL, min(MAX_INTEGRAL, integral_error))
+
+            if phase == "TAKEOFF":
+                # Use moderate gains and higher base thrust for takeoff
+                KP_ALT = KP_ALT_TAKEOFF
+                KI_ALT = KI_ALT_TAKEOFF
+                KD_ALT = KD_ALT_TAKEOFF
+                base_thrust = TAKEOFF_THRUST if current_alt < 0.5 else HOVER_THRUST
+            else:
+                # Use stronger gains for stable hover
+                KP_ALT = KP_ALT_HOVER
+                KI_ALT = KI_ALT_HOVER
+                KD_ALT = KD_ALT_HOVER
+                base_thrust = HOVER_THRUST
+
+            # Proportional term (error correction)
             thrust_p = KP_ALT * altitude_error
+
+            # Integral term (steady-state error elimination)
+            thrust_i = KI_ALT * integral_error
 
             # Derivative term (damping based on vertical velocity)
             # Negative velocity feedback: if moving up too fast, reduce thrust
             thrust_d = -KD_ALT * current_vz
 
             # Combined thrust
-            thrust = HOVER_THRUST + thrust_p + thrust_d
-            thrust = max(0.35, min(0.65, thrust))  # Tighter limits for stability
+            thrust = base_thrust + thrust_p + thrust_i + thrust_d
+
+            # Much wider limits - previous 0.68 max was too low, drone couldn't lift off!
+            if phase == "TAKEOFF":
+                thrust = max(0.40, min(0.85, thrust))  # Allow high thrust for liftoff
+            else:
+                thrust = max(0.52, min(0.75, thrust))  # Moderate range for stable hover
 
             # Phase management
             if phase == "TAKEOFF":
@@ -274,6 +331,16 @@ def test_with_visualization():
             # Get feedback
             msg = master.recv_match(type='ATTITUDE', blocking=False, timeout=0.01)
             if msg:
+                # Log data at high rate (every iteration) for detailed analysis
+                log_file.write(f"{elapsed:.3f}, {phase}, {current_alt:.4f}, {altitude_error:.4f}, {current_vz:.4f}, "
+                               f"{thrust:.6f}, {thrust_p:.6f}, {thrust_i:.6f}, {thrust_d:.6f}, {integral_error:.6f}, "
+                               f"{math.degrees(msg.roll):.2f}, {math.degrees(msg.pitch):.2f}, "
+                               f"{math.degrees(msg.yaw):.2f}, {math.degrees(msg.yawspeed):.2f}\n")
+
+                # Flush every 50 iterations to ensure data is saved
+                if message_count % 50 == 0:
+                    log_file.flush()
+
                 # Append attitude data
                 times.append(elapsed)
                 rolls.append(math.degrees(msg.roll))
@@ -317,15 +384,15 @@ def test_with_visualization():
                     update_plots()
                     last_update = elapsed
 
-                    # Print status
-                    if message_count % 50 == 0:
+                    # Print detailed status with altitude error
+                    if message_count % 25 == 0:  # Print more frequently for better feedback
                         current_alt_display = altitudes[-1] if altitudes else 0.0
-                        print(f"[{elapsed:.1f}s] Phase: {phase:10s} | "
-                              f"Alt: {current_alt_display:5.2f}m (target: {TARGET_ALTITUDE}m) | "
-                              f"Vz: {current_vz:5.2f}m/s | "
-                              f"Thrust: {thrust:.3f} | "
-                              f"Yaw: {math.degrees(msg.yaw):6.1f}° | "
-                              f"Yaw rate: {math.degrees(msg.yawspeed):5.1f} deg/s (sp: {yaw_rate_deg:.1f})")
+                        alt_error = TARGET_ALTITUDE - current_alt_display
+                        print(f"[{elapsed:5.1f}s] {phase:10s} | "
+                              f"Alt: {current_alt_display:5.2f}m (err: {alt_error:+5.2f}m) | "
+                              f"Vz: {current_vz:+5.2f}m/s | "
+                              f"Thrust: {thrust:.3f} (P:{thrust_p:+.3f} I:{thrust_i:+.3f} D:{thrust_d:+.3f}) | "
+                              f"Yaw: {math.degrees(msg.yaw):6.1f}° ({math.degrees(msg.yawspeed):+5.1f}°/s, sp:{yaw_rate_deg:.0f})")
 
             message_count += 1
             time.sleep(0.02)  # 50 Hz
@@ -337,6 +404,12 @@ def test_with_visualization():
 
     except KeyboardInterrupt:
         print("\n✓ Test interrupted by user")
+    finally:
+        # Close log file
+        log_file.write(f"\n# Test ended: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        log_file.write(f"# Total duration: {time.time() - start_time:.1f} seconds\n")
+        log_file.close()
+        print(f"\n✓ Flight data saved to: {log_filename}")
 
     # Return to hover at current altitude
     print("\nReturning to hover...")
