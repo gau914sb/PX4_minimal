@@ -34,7 +34,7 @@ echo ""
 for i in $(seq 0 $((NUM_DRONES-1))); do
     INSTANCE=$i
     Y_POS=$(echo "$i * 2.0" | bc)
-    
+
     if [ $i -eq 0 ]; then
         echo "Drone $i (instance $INSTANCE): No standalone mode - will start Gazebo"
         PX4_SYS_AUTOSTART=4001 PX4_SIM_MODEL=gz_x500 \
